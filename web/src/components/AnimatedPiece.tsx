@@ -97,16 +97,6 @@ export function AnimatedPiece({ piece, cameraMode, onDone, onClick, onHover }: A
     }
   })
 
-  if (piece.captured && piece.done) {
-    return (
-      <group ref={groupRef} scale={0.72}>
-        <Suspense fallback={null}>
-          <GlbPiece pieceType={piece.pieceType} color={piece.color} />
-        </Suspense>
-      </group>
-    )
-  }
-
   const freeCamera = cameraMode === 'free'
 
   const handleSelect = (e: ThreeEvent<MouseEvent>) => {
@@ -125,8 +115,8 @@ export function AnimatedPiece({ piece, cameraMode, onDone, onClick, onHover }: A
   return (
     <group
       ref={groupRef}
-      onClick={freeCamera ? handleSelect : undefined}
-      onPointerDown={freeCamera ? undefined : onPointerDown}
+      onClick={freeCamera && !piece.captured ? handleSelect : undefined}
+      onPointerDown={freeCamera || piece.captured ? undefined : onPointerDown}
       onPointerEnter={(e) => {
         if (piece.captured || !piece.square) return
         e.stopPropagation()

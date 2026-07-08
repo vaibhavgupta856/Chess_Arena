@@ -2,12 +2,12 @@ import type { BoardLayout } from './boardLayout'
 
 export const VALHALLA_LABEL = 'VALHALLA'
 
-export const VALHALLA_PLATFORM_WIDTH = 4.6
-export const VALHALLA_PLATFORM_DEPTH = 5.4
+export const VALHALLA_PLATFORM_WIDTH = 8.2
+export const VALHALLA_PLATFORM_DEPTH = 10.4
 
 export function valhallaPlatformX(color: 'white' | 'black'): number {
   // White fallen pieces rest on the left; black on the right.
-  return color === 'white' ? -7.4 : 7.4
+  return color === 'white' ? -10.2 : 10.2
 }
 
 export function valhallaSlotPosition(
@@ -18,9 +18,9 @@ export function valhallaSlotPosition(
   const cols = 4
   const col = index % cols
   const row = Math.floor(index / cols)
-  const spacing = layout.cellSize * 0.72
+  const spacing = layout.cellSize * 0.98
   const x = valhallaPlatformX(color) + (col - (cols - 1) / 2) * spacing
-  const z = (row - 2) * spacing * 0.92
+  const z = (row - 2.5) * spacing
   const y = layout.surfaceY + 0.02
   return [x, y, z]
 }

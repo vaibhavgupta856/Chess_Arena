@@ -23,6 +23,9 @@ import { ValhallaPlatforms } from './ValhallaPlatforms'
 
 type Props = {
   game: GameState
+  displayFen: string
+  atLivePosition: boolean
+  canMove: boolean
   onMove: (uci: string) => void
   onSwitchTo2D?: () => void
 }
@@ -221,6 +224,9 @@ function SquareHighlights({
 
 function Scene({
   game,
+  displayFen,
+  atLivePosition,
+  canMove,
   onMove,
   cameraMode,
   cameraAngle,
@@ -234,7 +240,8 @@ function Scene({
   const idCounterRef = useRef(0)
   const captureCountRef = useRef({ white: 0, black: 0 })
 
-  const pieces = useMemo(() => fenToPieces(game.fen), [game.fen])
+  const pieces = useMemo(() => fenToPieces(displayFen), [displayFen])
+  const turn = useMemo(() => (displayFen.split(' ')[1] === 'w' ? 'white' : 'black'), [displayFen])
   const layout = useMemo(() => getBoardLayout(boardSurfaceY), [boardSurfaceY])
 
   const initPieces = useCallback((fen: string) => {
@@ -386,6 +393,11 @@ function Scene({
   const gameIdRef = useRef(game.id)
 
   useEffect(() => {
+    if (!atLivePosition) {
+      setSelected(null)
+      initPieces(displayFen)
+      return
+    }
     if (gameIdRef.current !== game.id) {
       gameIdRef.current = game.id
       prevFenRef.current = null
@@ -400,9 +412,10 @@ function Scene({
     }
     if (prevFenRef.current === game.fen) return
     animateTransition(prevFenRef.current, game.fen)
-  }, [game.id, game.fen, initPieces, animateTransition])
+  }, [game.id, game.fen, displayFen, atLivePosition, initPieces, animateTransition])
 
   useEffect(() => {
+    if (!atLivePosition) return
     if (!prevFenRef.current) return
     setVisualPieces((current) =>
       current.map((p) => {
@@ -439,12 +452,12 @@ function Scene({
   }, [game.fen])
 
   const handleSquareClick = (square: string) => {
-    if (game.over) return
+    if (game.over || !canMove) return
 
     if (!selected) {
       const piece = pieces.find((p) => p.square === square)
       if (!piece) return
-      if (piece.color !== game.turn) return
+      if (piece.color !== turn) return
       setSelected(square)
       return
     }
@@ -454,7 +467,13 @@ function Scene({
       return
     }
 
-    onMove(buildUCI(selected, square, game.turn))
+    const clicked = pieces.find((p) => p.square === square)
+    if (clicked && clicked.color === turn) {
+      setSelected(square)
+      return
+    }
+
+    onMove(buildUCI(selected, square, turn))
     setSelected(null)
   }
 
@@ -518,7 +537,7 @@ function Scene({
   )
 }
 
-export function ChessBoard3D({ game, onMove, onSwitchTo2D }: Props) {
+export function ChessBoard3D({ game, displayFen, atLivePosition, canMove, onMove, onSwitchTo2D }: Props) {
   const { isLoading, progress } = usePreload3DAssets()
   const [cameraMode, setCameraMode] = useState<CameraMode>('fixed')
   const [cameraAngle, setCameraAngle] = useState<CameraAngleId>('corner-ne')
@@ -529,39 +548,41 @@ export function ChessBoard3D({ game, onMove, onSwitchTo2D }: Props) {
 
   return (
     <div className="board-3d">
-      <div className="camera-controls">
-        <div className="camera-controls-row">
-          <span className="camera-controls-label">Camera</span>
-          <button
-            type="button"
-            className={cameraMode === 'fixed' ? 'active' : ''}
-            onClick={() => setCameraMode('fixed')}
-          >
-            Fixed angles
-          </button>
-          <button
-            type="button"
-            className={cameraMode === 'free' ? 'active' : ''}
-            onClick={() => setCameraMode('free')}
-            title="Left-click drag to rotate; scroll to zoom"
-          >
-            Free drag
-          </button>
-        </div>
-        {cameraMode === 'fixed' && (
-          <div className="camera-controls-row camera-controls-angles">
-            {CAMERA_PRESETS.map((preset) => (
-              <button
-                key={preset.id}
-                type="button"
-                className={cameraAngle === preset.id ? 'active' : ''}
-                onClick={() => setCameraAngle(preset.id)}
-              >
-                {preset.label}
-              </button>
-            ))}
+      <div className="board-3d-ui">
+        <div className="camera-controls">
+          <div className="camera-controls-row">
+            <span className="camera-controls-label">Camera</span>
+            <button
+              type="button"
+              className={cameraMode === 'fixed' ? 'active' : ''}
+              onClick={() => setCameraMode('fixed')}
+            >
+              Fixed angles
+            </button>
+            <button
+              type="button"
+              className={cameraMode === 'free' ? 'active' : ''}
+              onClick={() => setCameraMode('free')}
+              title="Left-click drag to rotate; scroll to zoom"
+            >
+              Free drag
+            </button>
           </div>
-        )}
+          {cameraMode === 'fixed' && (
+            <div className="camera-controls-row camera-controls-angles">
+              {CAMERA_PRESETS.map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  className={cameraAngle === preset.id ? 'active' : ''}
+                  onClick={() => setCameraAngle(preset.id)}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {isLoading && (
@@ -584,12 +605,15 @@ export function ChessBoard3D({ game, onMove, onSwitchTo2D }: Props) {
           </div>
         </div>
       )}
-      <Canvas shadows camera={{ position: [7.5, 9.5, -7.5], fov: 48 }}>
+      <Canvas className="board-3d-canvas" shadows camera={{ position: [7.5, 9.5, -7.5], fov: 48 }}>
         <color attach="background" args={['#9ec8e8']} />
         <fog attach="fog" args={['#9ec8e8', 16, 32]} />
         <Suspense fallback={null}>
           <Scene
             game={game}
+            displayFen={displayFen}
+            atLivePosition={atLivePosition}
+            canMove={canMove}
             onMove={onMove}
             cameraMode={cameraMode}
             cameraAngle={cameraAngle}

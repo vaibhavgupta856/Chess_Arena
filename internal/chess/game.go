@@ -85,6 +85,19 @@ func (g *Game) HalfMoveClock() int {
 	return g.current().halfMove
 }
 
+// Ply returns the number of half-moves played from the starting position.
+func (g *Game) Ply() int {
+	return len(g.positions) - 1
+}
+
+// FENAt returns the FEN at a given ply (0 = start).
+func (g *Game) FENAt(ply int) (string, error) {
+	if ply < 0 || ply >= len(g.positions) {
+		return "", fmt.Errorf("chess: ply %d out of range", ply)
+	}
+	return g.positions[ply].fen(), nil
+}
+
 // MoveHistory returns all played moves with notation.
 func (g *Game) MoveHistory() []MoveRecord {
 	records := make([]MoveRecord, 0, len(g.moves))
