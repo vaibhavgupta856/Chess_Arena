@@ -10,7 +10,7 @@ import {
 } from '../lib/modelUtils'
 
 const templateCache = new Map<string, THREE.Object3D>()
-const MATERIAL_VERSION = 'contrast-v3'
+const MATERIAL_VERSION = 'contrast-v4'
 
 type GlbPieceProps = {
   pieceType: string
@@ -20,17 +20,17 @@ type GlbPieceProps = {
 function pieceBaseRadius(kind: string) {
   switch (kind) {
     case 'P':
-      return 0.22
+      return 0.28
     case 'N':
     case 'B':
     case 'R':
-      return 0.26
+      return 0.34
     case 'Q':
-      return 0.29
+      return 0.38
     case 'K':
-      return 0.31
+      return 0.4
     default:
-      return 0.24
+      return 0.32
   }
 }
 
@@ -47,7 +47,6 @@ export function GlbPiece({ pieceType, color }: GlbPieceProps) {
     const processed = scene.clone(true)
     applySideMaterials(processed, color)
 
-    // Scale hierarchy: pawn < minor/rook < queen < king
     let targetSize = 0.9
     switch (kind) {
       case 'P':
@@ -74,28 +73,26 @@ export function GlbPiece({ pieceType, color }: GlbPieceProps) {
     return processed
   }, [kind, scene, color])
 
-  // Each piece instance needs its own Object3D (so it can have a different parent).
   const model = useMemo(() => template.clone(true), [template])
   const radius = pieceBaseRadius(kind)
-  const ringColor = color === 'white' ? '#1a1a1a' : '#1f1008'
+  const fill = color === 'white' ? '#f2f2f2' : '#d48a3a'
+  const edge = color === 'white' ? '#101820' : '#3a1f0a'
 
   return (
-    <group rotation={[0, pieceFacingRotation(color), 0]}>
-      {/* Lightweight ground ring — keeps pieces readable without cloning heavy GLBs */}
-      <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={5}>
-        <ringGeometry args={[radius * 0.72, radius, 32]} />
-        <meshBasicMaterial color={ringColor} transparent opacity={0.9} depthWrite={false} />
+    <group>
+      {/* Base markers sit outside piece rotation so every type shows a clear ring */}
+      <mesh position={[0, 0.025, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={12}>
+        <ringGeometry args={[radius * 0.62, radius, 48]} />
+        <meshBasicMaterial color={edge} transparent opacity={0.95} depthWrite={false} depthTest={false} />
       </mesh>
-      <mesh position={[0, 0.008, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={4}>
-        <circleGeometry args={[radius * 0.7, 24]} />
-        <meshBasicMaterial
-          color={color === 'white' ? '#ffffff' : '#c47830'}
-          transparent
-          opacity={0.35}
-          depthWrite={false}
-        />
+      <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={11}>
+        <circleGeometry args={[radius * 0.6, 32]} />
+        <meshBasicMaterial color={fill} transparent opacity={0.55} depthWrite={false} depthTest={false} />
       </mesh>
-      <primitive object={model} castShadow receiveShadow />
+
+      <group rotation={[0, pieceFacingRotation(color), 0]}>
+        <primitive object={model} castShadow receiveShadow />
+      </group>
     </group>
   )
 }

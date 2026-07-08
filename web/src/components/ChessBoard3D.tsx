@@ -1,4 +1,4 @@
-import { Canvas, useFrame } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Text, useGLTF } from '@react-three/drei'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePreload3DAssets } from '../hooks/usePreload3DAssets'
@@ -23,6 +23,22 @@ type Props = {
   onMove: (uci: string) => void
   onSwitchTo2D?: () => void
 }
+
+type CameraMode = 'fixed' | 'free'
+type CameraAngleId = 'white' | 'black' | 'side' | 'top'
+
+type CameraPreset = {
+  id: CameraAngleId
+  label: string
+  position: [number, number, number]
+}
+
+const CAMERA_PRESETS: CameraPreset[] = [
+  { id: 'white', label: 'White side', position: [0, 10, 11] },
+  { id: 'black', label: 'Black side', position: [0, 10, -11] },
+  { id: 'side', label: 'Side', position: [12, 9, 0] },
+  { id: 'top', label: 'Top', position: [0, 16, 0.01] },
+]
 
 const SELECT_COLOR = '#5ce1ff'
 const HOVER_COLOR = '#ff9f43'
@@ -167,7 +183,12 @@ function SquareHighlights({
   )
 }
 
-function Scene({ game, onMove }: Props) {
+function Scene({
+  game,
+  onMove,
+  cameraMode,
+  cameraAngle,
+}: Props & { cameraMode: CameraMode; cameraAngle: CameraAngleId }) {
   const [selected, setSelected] = useState<string | null>(null)
   const [hovered, setHovered] = useState<string | null>(null)
   const [boardSurfaceY, setBoardSurfaceY] = useState(0.06)
@@ -176,9 +197,23 @@ function Scene({ game, onMove }: Props) {
   const squareToIdRef = useRef<Map<string, string>>(new Map())
   const idCounterRef = useRef(0)
   const captureCountRef = useRef({ white: 0, black: 0 })
+  const controlsRef = useRef<any>(null)
+  const { camera } = useThree()
 
   const pieces = useMemo(() => fenToPieces(game.fen), [game.fen])
   const layout = useMemo(() => getBoardLayout(boardSurfaceY), [boardSurfaceY])
+
+  useEffect(() => {
+    if (cameraMode !== 'fixed') return
+    const preset = CAMERA_PRESETS.find((p) => p.id === cameraAngle) ?? CAMERA_PRESETS[0]
+    camera.position.set(...preset.position)
+    camera.lookAt(0, 0, 0)
+    camera.updateProjectionMatrix()
+    if (controlsRef.current) {
+      controlsRef.current.target.set(0, 0, 0)
+      controlsRef.current.update()
+    }
+  }, [cameraMode, cameraAngle, camera])
 
   const initPieces = useCallback((fen: string) => {
     const next = fenToPieces(fen)
@@ -393,6 +428,10 @@ function Scene({ game, onMove }: Props) {
       </Text>
 
       <OrbitControls
+        ref={controlsRef}
+        enabled={cameraMode === 'free'}
+        enableRotate={cameraMode === 'free'}
+        enableZoom={cameraMode === 'free'}
         enablePan={false}
         minPolarAngle={0.25}
         maxPolarAngle={Math.PI / 2.05}
@@ -405,6 +444,8 @@ function Scene({ game, onMove }: Props) {
 
 export function ChessBoard3D({ game, onMove, onSwitchTo2D }: Props) {
   const { isLoading, progress } = usePreload3DAssets()
+  const [cameraMode, setCameraMode] = useState<CameraMode>('fixed')
+  const [cameraAngle, setCameraAngle] = useState<CameraAngleId>('white')
 
   useEffect(() => {
     ALL_MODEL_URLS.forEach((url) => useGLTF.preload(url))
@@ -412,6 +453,40 @@ export function ChessBoard3D({ game, onMove, onSwitchTo2D }: Props) {
 
   return (
     <div className="board-3d">
+      <div className="camera-controls">
+        <div className="camera-controls-row">
+          <span className="camera-controls-label">Camera</span>
+          <button
+            type="button"
+            className={cameraMode === 'fixed' ? 'active' : ''}
+            onClick={() => setCameraMode('fixed')}
+          >
+            Fixed angles
+          </button>
+          <button
+            type="button"
+            className={cameraMode === 'free' ? 'active' : ''}
+            onClick={() => setCameraMode('free')}
+          >
+            Free drag
+          </button>
+        </div>
+        {cameraMode === 'fixed' && (
+          <div className="camera-controls-row camera-controls-angles">
+            {CAMERA_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                className={cameraAngle === preset.id ? 'active' : ''}
+                onClick={() => setCameraAngle(preset.id)}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
       {isLoading && (
         <div className="loading-screen" role="status" aria-live="polite">
           <div className="loading-overlay">
@@ -432,11 +507,16 @@ export function ChessBoard3D({ game, onMove, onSwitchTo2D }: Props) {
           </div>
         </div>
       )}
-      <Canvas shadows camera={{ position: [0, 10, 10], fov: 48 }}>
+      <Canvas shadows camera={{ position: [0, 10, 11], fov: 48 }}>
         <color attach="background" args={['#9ec8e8']} />
         <fog attach="fog" args={['#9ec8e8', 16, 32]} />
         <Suspense fallback={null}>
-          <Scene game={game} onMove={onMove} />
+          <Scene
+            game={game}
+            onMove={onMove}
+            cameraMode={cameraMode}
+            cameraAngle={cameraAngle}
+          />
         </Suspense>
       </Canvas>
     </div>
