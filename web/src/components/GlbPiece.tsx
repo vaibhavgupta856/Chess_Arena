@@ -61,8 +61,23 @@ export function GlbPiece({ pieceType, color }: GlbPieceProps) {
   // We reuse the processed template to avoid recoloring/normalizing on every instance.
   const model = useMemo(() => template.clone(true), [template])
 
+  // Simple outline: a slightly scaled clone rendered with a dark, unlit material.
+  const outline = useMemo(() => {
+    const cloned = template.clone(true)
+    cloned.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.material = new THREE.MeshBasicMaterial({
+          color: '#000000',
+          side: THREE.BackSide,
+        })
+      }
+    })
+    return cloned
+  }, [template])
+
   return (
     <group rotation={[0, pieceFacingRotation(color), 0]}>
+      <primitive object={outline} scale={1.06} />
       <primitive object={model} castShadow receiveShadow />
     </group>
   )
