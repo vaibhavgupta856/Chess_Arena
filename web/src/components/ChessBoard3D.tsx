@@ -342,10 +342,12 @@ function Scene({ game, onMove }: Props) {
 
   return (
     <>
-      <ambientLight intensity={0.75} />
-      <directionalLight position={[6, 14, 5]} intensity={1.4} castShadow />
-      <directionalLight position={[-5, 10, -4]} intensity={0.5} />
-      <pointLight position={[0, 8, 0]} intensity={0.45} />
+      <ambientLight intensity={1.05} />
+      <hemisphereLight args={['#d4ecff', '#2a5240', 0.55]} />
+      <directionalLight position={[6, 14, 5]} intensity={1.25} castShadow />
+      <directionalLight position={[-4, 8, 6]} intensity={0.65} />
+      <directionalLight position={[0, 5, -8]} intensity={0.35} />
+      <pointLight position={[0, 10, 0]} intensity={0.5} color="#fff8ee" />
 
       <Suspense fallback={null}>
         <TileBoard onSurfaceY={setBoardSurfaceY} />

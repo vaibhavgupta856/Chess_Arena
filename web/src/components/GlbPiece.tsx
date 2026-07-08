@@ -10,7 +10,7 @@ import {
 } from '../lib/modelUtils'
 
 const templateCache = new Map<string, THREE.Object3D>()
-const MATERIAL_VERSION = 'brown-v1'
+const MATERIAL_VERSION = 'contrast-v2'
 
 type GlbPieceProps = {
   pieceType: string

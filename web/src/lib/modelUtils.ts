@@ -2,8 +2,8 @@ import * as THREE from 'three'
 
 export const DEFAULT_BOARD_SURFACE_Y = 0.614
 
-const SAND_TILE = '#d9c9a3'
-const GREEN_TILE = '#3f6b52'
+const SAND_TILE = '#b8ad92'
+const GREEN_TILE = '#2a5240'
 
 function isDarkMaterial(color: THREE.Color): boolean {
   const luminance = 0.299 * color.r + 0.587 * color.g + 0.114 * color.b
@@ -29,25 +29,44 @@ export function applySideMaterials(root: THREE.Object3D, side: 'white' | 'black'
     const materials = Array.isArray(source) ? source : [source]
     const next = materials.map((mat) => {
       const cloned = mat.clone()
+
+      cloned.map = null
+      cloned.normalMap = null
+      cloned.aoMap = null
+      cloned.emissiveMap = null
       if (
         cloned instanceof THREE.MeshStandardMaterial ||
         cloned instanceof THREE.MeshPhysicalMaterial
       ) {
-        if (side === 'white') {
-          cloned.color.set('#ffffff')
-          cloned.emissive = new THREE.Color('#ffffff')
-          cloned.emissiveIntensity = 0.07
-          cloned.metalness = Math.max(cloned.metalness, 0.22)
-          cloned.roughness = Math.min(cloned.roughness, 0.26)
-        } else {
-          // Warm brown so the dark side is clearly visible against the board.
-          cloned.color.set('#9B5E2E')
-          cloned.emissive = new THREE.Color('#4A2F14')
-          cloned.emissiveIntensity = 0.05
-          cloned.metalness = Math.max(cloned.metalness, 0.28)
-          cloned.roughness = Math.min(cloned.roughness, 0.42)
+        cloned.metalnessMap = null
+        cloned.roughnessMap = null
+      }
+
+      if (side === 'white') {
+        cloned.color.set('#f8f8ff')
+        cloned.emissive = new THREE.Color('#e8ecff')
+        cloned.emissiveIntensity = 0.08
+        if (
+          cloned instanceof THREE.MeshStandardMaterial ||
+          cloned instanceof THREE.MeshPhysicalMaterial
+        ) {
+          cloned.metalness = 0.15
+          cloned.roughness = 0.35
+        }
+      } else {
+        // Bright caramel wood — high contrast against green/sand tiles and white pieces.
+        cloned.color.set('#d48a3a')
+        cloned.emissive = new THREE.Color('#a85f20')
+        cloned.emissiveIntensity = 0.14
+        if (
+          cloned instanceof THREE.MeshStandardMaterial ||
+          cloned instanceof THREE.MeshPhysicalMaterial
+        ) {
+          cloned.metalness = 0.06
+          cloned.roughness = 0.48
         }
       }
+
       return cloned
     })
 
