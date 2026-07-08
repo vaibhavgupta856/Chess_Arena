@@ -27,7 +27,15 @@ type Props = {
 }
 
 type CameraMode = 'fixed' | 'free'
-type CameraAngleId = 'corner' | 'white' | 'black' | 'side' | 'top'
+type CameraAngleId =
+  | 'corner-ne'
+  | 'corner-nw'
+  | 'corner-se'
+  | 'corner-sw'
+  | 'white'
+  | 'black'
+  | 'side'
+  | 'top'
 
 type CameraPreset = {
   id: CameraAngleId
@@ -36,7 +44,10 @@ type CameraPreset = {
 }
 
 const CAMERA_PRESETS: CameraPreset[] = [
-  { id: 'corner', label: 'Corner', position: [7.5, 9.5, -7.5] },
+  { id: 'corner-ne', label: 'Corner NE', position: [7.5, 9.5, -7.5] },
+  { id: 'corner-nw', label: 'Corner NW', position: [-7.5, 9.5, -7.5] },
+  { id: 'corner-se', label: 'Corner SE', position: [7.5, 9.5, 7.5] },
+  { id: 'corner-sw', label: 'Corner SW', position: [-7.5, 9.5, 7.5] },
   { id: 'white', label: 'White side', position: [0, 10, -11] },
   { id: 'black', label: 'Black side', position: [0, 10, 11] },
   { id: 'side', label: 'Side', position: [12, 9, 0] },
@@ -444,7 +455,7 @@ function Scene({
 export function ChessBoard3D({ game, onMove, onSwitchTo2D }: Props) {
   const { isLoading, progress } = usePreload3DAssets()
   const [cameraMode, setCameraMode] = useState<CameraMode>('fixed')
-  const [cameraAngle, setCameraAngle] = useState<CameraAngleId>('corner')
+  const [cameraAngle, setCameraAngle] = useState<CameraAngleId>('corner-ne')
 
   useEffect(() => {
     ALL_MODEL_URLS.forEach((url) => useGLTF.preload(url))

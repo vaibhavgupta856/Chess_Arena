@@ -10,6 +10,9 @@ type ValhallaPlatformsProps = {
 function Platform({ color, layout }: { color: 'white' | 'black'; layout: BoardLayout }) {
   const x = valhallaPlatformX(color)
   const slabY = -BOARD_THICKNESS / 2 - 0.06
+  const facesWhiteSide = color === 'white'
+  const labelZ = facesWhiteSide ? 1.85 : -1.85
+  const labelRotation: [number, number, number] = facesWhiteSide ? [0, Math.PI, 0] : [0, 0, 0]
 
   return (
     <group position={[x, layout.surfaceY, 0]}>
@@ -22,7 +25,8 @@ function Platform({ color, layout }: { color: 'white' | 'black'; layout: BoardLa
         <meshStandardMaterial color="#5a3d28" roughness={0.88} metalness={0.05} />
       </mesh>
       <Text
-        position={[0, 0.42, -1.95]}
+        position={[0, 0.42, labelZ]}
+        rotation={labelRotation}
         fontSize={0.32}
         color="#e8d4a8"
         anchorX="center"
@@ -31,7 +35,8 @@ function Platform({ color, layout }: { color: 'white' | 'black'; layout: BoardLa
         {VALHALLA_LABEL}
       </Text>
       <Text
-        position={[0, 0.22, -1.95]}
+        position={[0, 0.22, labelZ]}
+        rotation={labelRotation}
         fontSize={0.16}
         color="#c9b08a"
         anchorX="center"
