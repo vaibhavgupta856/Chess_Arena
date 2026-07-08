@@ -1,5 +1,5 @@
 import { Canvas, useFrame } from '@react-three/fiber'
-import { OrbitControls, Text, useGLTF } from '@react-three/drei'
+import { Html, OrbitControls, Text, useGLTF, useProgress } from '@react-three/drei'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ThreeEvent } from '@react-three/fiber'
 import type { MeshStandardMaterial } from 'three'
@@ -24,6 +24,20 @@ type Props = {
 
 const SELECT_COLOR = '#5ce1ff'
 const HOVER_COLOR = '#ff9f43'
+
+function LoadingOverlay() {
+  const { active } = useProgress()
+  if (!active) return null
+
+  return (
+    <Html center>
+      <div className="loading-overlay">
+        <h2>3D assets are loading…</h2>
+        <p>Assets are loading, please wait. You can use the 2D view for now and come back to 3D.</p>
+      </div>
+    </Html>
+  )
+}
 
 function capturePosition(
   color: 'white' | 'black',
@@ -403,6 +417,7 @@ export function ChessBoard3D({ game, onMove }: Props) {
       <Canvas shadows camera={{ position: [0, 10, 10], fov: 48 }}>
         <color attach="background" args={['#12151c']} />
         <fog attach="fog" args={['#12151c', 14, 28]} />
+        <LoadingOverlay />
         <Scene game={game} onMove={onMove} />
       </Canvas>
     </div>
