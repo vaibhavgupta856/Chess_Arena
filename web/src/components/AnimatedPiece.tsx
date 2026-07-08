@@ -14,6 +14,7 @@ export type PieceVisual = Omit<BoardPiece, 'square'> & {
   targetY: number
   targetZ: number
   captured: boolean
+  valhallaIndex: number | null
   done: boolean
 }
 
@@ -81,7 +82,15 @@ export function AnimatedPiece({ piece, onDone, onClick, onHover }: AnimatedPiece
     }
   })
 
-  if (piece.captured && piece.done) return null
+  if (piece.captured && piece.done) {
+    return (
+      <group ref={groupRef} scale={0.72}>
+        <Suspense fallback={null}>
+          <GlbPiece pieceType={piece.pieceType} color={piece.color} />
+        </Suspense>
+      </group>
+    )
+  }
 
   return (
     <group

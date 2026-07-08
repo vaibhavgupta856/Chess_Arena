@@ -15,8 +15,10 @@ import {
 } from '../lib/boardLayout'
 import { buildUCI, diffBoardTransition, fenToPieces } from '../lib/fen'
 import { ALL_MODEL_URLS } from '../lib/models'
+import { valhallaSlotPosition } from '../lib/valhalla'
 import { AnimatedPiece, type PieceVisual } from './AnimatedPiece'
 import { TileBoard } from './TileBoard'
+import { ValhallaPlatforms } from './ValhallaPlatforms'
 
 type Props = {
   game: GameState
@@ -43,18 +45,6 @@ const CAMERA_PRESETS: CameraPreset[] = [
 
 const SELECT_COLOR = '#5ce1ff'
 const HOVER_COLOR = '#ff9f43'
-
-function capturePosition(
-  color: 'white' | 'black',
-  index: number,
-  layout: BoardLayout,
-): [number, number, number] {
-  const a1 = layout.squares.get('a1')!
-  const h1 = layout.squares.get('h1')!
-  const sideX = color === 'white' ? a1.x - layout.cellSize * 2.2 : h1.x + layout.cellSize * 2.2
-  const baseZ = a1.z + index * layout.cellSize * 0.72
-  return [sideX, layout.surfaceY * 0.55, baseZ]
-}
 
 function SquareHitbox({
   square,
@@ -233,6 +223,7 @@ function Scene({
         targetY: y,
         targetZ: z,
         captured: false,
+        valhallaIndex: null,
         done: true,
       }
     })
@@ -260,9 +251,10 @@ function Scene({
 
           const idx = captureCountRef.current[captured.color]
           captureCountRef.current[captured.color] += 1
-          const [tx, ty, tz] = capturePosition(captured.color, idx, layout)
+          const [tx, ty, tz] = valhallaSlotPosition(captured.color, idx, layout)
 
           piece.captured = true
+          piece.valhallaIndex = idx
           piece.square = null
           piece.targetX = tx
           piece.targetY = ty
@@ -304,6 +296,7 @@ function Scene({
             targetY: y,
             targetZ: z,
             captured: false,
+            valhallaIndex: null,
             done: true,
           })
           squareToId.set(boardPiece.square, id)
@@ -331,7 +324,13 @@ function Scene({
     if (!prevFenRef.current) return
     setVisualPieces((current) =>
       current.map((p) => {
-        if (p.captured || !p.square) return p
+        if (p.captured) {
+          const idx = p.valhallaIndex ?? 0
+          const [tx, ty, tz] = valhallaSlotPosition(p.color, idx, layout)
+          if (!p.done) return { ...p, targetX: tx, targetY: ty, targetZ: tz }
+          return { ...p, x: tx, y: ty, z: tz, targetX: tx, targetY: ty, targetZ: tz }
+        }
+        if (!p.square) return p
         const [x, y, z] = squareToWorld(p.square, layout)
         if (!p.done) return { ...p, targetX: x, targetY: y, targetZ: z }
         return { ...p, x, y, z, targetX: x, targetY: y, targetZ: z }
@@ -341,18 +340,16 @@ function Scene({
 
   const handlePieceDone = useCallback((id: string) => {
     setVisualPieces((current) =>
-      current
-        .map((p) => {
-          if (p.id !== id) return p
-          return {
-            ...p,
-            x: p.targetX,
-            y: p.targetY,
-            z: p.targetZ,
-            done: true,
-          }
-        })
-        .filter((p) => !(p.id === id && p.captured)),
+      current.map((p) => {
+        if (p.id !== id) return p
+        return {
+          ...p,
+          x: p.targetX,
+          y: p.targetY,
+          z: p.targetZ,
+          done: true,
+        }
+      }),
     )
   }, [])
 
@@ -393,6 +390,7 @@ function Scene({
 
       <Suspense fallback={null}>
         <TileBoard onSurfaceY={setBoardSurfaceY} />
+        <ValhallaPlatforms layout={layout} />
       </Suspense>
 
       {allSquares(layout).map((sq) => (
