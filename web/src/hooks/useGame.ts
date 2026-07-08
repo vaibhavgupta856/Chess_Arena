@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { GameState } from '../types'
 
-const API_BASE = 'http://localhost:8080'
+const API_BASE =
+  import.meta.env.VITE_API_BASE && import.meta.env.VITE_API_BASE.length > 0
+    ? import.meta.env.VITE_API_BASE
+    : 'http://localhost:8080'
 
 export function useGame() {
   const [game, setGame] = useState<GameState | null>(null)
@@ -51,7 +54,10 @@ export function useGame() {
         if (cancelled) return
         setGame(data)
 
-        socket = new WebSocket(`ws://localhost:8080/ws/games/${data.id}`)
+        const wsUrl =
+          API_BASE.replace(/^http/, 'ws').replace(/\/+$/, '') +
+          `/ws/games/${data.id}`
+        socket = new WebSocket(wsUrl)
         socket.onmessage = (event) => {
           const updated = JSON.parse(event.data) as GameState
           setGame(updated)

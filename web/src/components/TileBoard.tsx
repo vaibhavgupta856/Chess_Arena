@@ -14,6 +14,14 @@ function prepareTileNode(root: THREE.Object3D, nodeName: string | null): THREE.O
   }
   const clone = source.clone(true)
   normalizeTileFootprint(clone, TILE_FOOTPRINT, true)
+
+  // Avoid traversing for every clone we place on the board.
+  clone.traverse((child) => {
+    if (child instanceof THREE.Mesh) {
+      child.castShadow = true
+      child.receiveShadow = true
+    }
+  })
   return clone
 }
 
@@ -43,13 +51,6 @@ export function TileBoard({ onSurfaceY }: TileBoardProps) {
       // Base ground for every cell (keeps everything perfectly on the same plane).
       const base = forestTemplate.clone(true)
       base.position.set(sq.x, 0, sq.z)
-
-      base.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          child.castShadow = true
-          child.receiveShadow = true
-        }
-      })
       group.add(base)
 
       // Light (grass) squares: add smaller fern tufts on top of the same ground tile.
@@ -74,13 +75,6 @@ export function TileBoard({ onSurfaceY }: TileBoardProps) {
           tuft.scale.setScalar(scale)
           tuft.position.set(sq.x + dx, 0, sq.z + dz)
           tuft.rotation.set(0, rotY, 0)
-
-          tuft.traverse((child) => {
-            if (child instanceof THREE.Mesh) {
-              child.castShadow = true
-              child.receiveShadow = true
-            }
-          })
           group.add(tuft)
         }
       }
