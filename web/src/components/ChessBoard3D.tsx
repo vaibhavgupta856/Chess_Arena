@@ -1,7 +1,6 @@
-import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { OrbitControls, Text, useGLTF } from '@react-three/drei'
+import { Canvas, useFrame } from '@react-three/fiber'
+import { Text, useGLTF } from '@react-three/drei'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import * as THREE from 'three'
 import { usePreload3DAssets } from '../hooks/usePreload3DAssets'
 import type { ThreeEvent } from '@react-three/fiber'
 import type { MeshStandardMaterial } from 'three'
@@ -18,6 +17,7 @@ import { buildUCI, diffBoardTransition, fenToPieces } from '../lib/fen'
 import { ALL_MODEL_URLS } from '../lib/models'
 import { valhallaSlotPosition } from '../lib/valhalla'
 import { AnimatedPiece, type PieceVisual } from './AnimatedPiece'
+import { BoardCameraControls, CAMERA_PRESETS, type CameraAngleId, type CameraMode } from './BoardCameraControls'
 import { TileBoard } from './TileBoard'
 import { ValhallaPlatforms } from './ValhallaPlatforms'
 
@@ -26,34 +26,6 @@ type Props = {
   onMove: (uci: string) => void
   onSwitchTo2D?: () => void
 }
-
-type CameraMode = 'fixed' | 'free'
-type CameraAngleId =
-  | 'corner-ne'
-  | 'corner-nw'
-  | 'corner-se'
-  | 'corner-sw'
-  | 'white'
-  | 'black'
-  | 'side'
-  | 'top'
-
-type CameraPreset = {
-  id: CameraAngleId
-  label: string
-  position: [number, number, number]
-}
-
-const CAMERA_PRESETS: CameraPreset[] = [
-  { id: 'corner-ne', label: 'Corner NE', position: [7.5, 9.5, -7.5] },
-  { id: 'corner-nw', label: 'Corner NW', position: [-7.5, 9.5, -7.5] },
-  { id: 'corner-se', label: 'Corner SE', position: [7.5, 9.5, 7.5] },
-  { id: 'corner-sw', label: 'Corner SW', position: [-7.5, 9.5, 7.5] },
-  { id: 'white', label: 'White side', position: [0, 10, -11] },
-  { id: 'black', label: 'Black side', position: [0, 10, 11] },
-  { id: 'side', label: 'Side', position: [12, 9, 0] },
-  { id: 'top', label: 'Top', position: [0, 16, 0.01] },
-]
 
 const SELECT_COLOR = '#5ce1ff'
 const HOVER_COLOR = '#ff9f43'
@@ -113,6 +85,7 @@ function SquareHitbox({
   x,
   z,
   layout,
+  cameraMode,
   onClick,
   onHover,
 }: {
@@ -120,9 +93,15 @@ function SquareHitbox({
   x: number
   z: number
   layout: BoardLayout
+  cameraMode: CameraMode
   onClick: (square: string) => void
   onHover: (square: string | null) => void
 }) {
+  const handleSelect = (e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation()
+    onClick(square)
+  }
+
   const onPointerDown = (e: ThreeEvent<PointerEvent>) => {
     if (e.button !== 0) return
     e.stopPropagation()
@@ -131,11 +110,13 @@ function SquareHitbox({
 
   const hitY = layout.surfaceY + 0.04
   const [hitW, hitD] = getSquareHitSize(square, layout)
+  const freeCamera = cameraMode === 'free'
 
   return (
     <mesh
       position={[x, hitY, z]}
-      onPointerDown={onPointerDown}
+      onClick={freeCamera ? handleSelect : undefined}
+      onPointerDown={freeCamera ? undefined : onPointerDown}
       onPointerEnter={(e) => {
         e.stopPropagation()
         onHover(square)
@@ -170,7 +151,8 @@ function SquareHighlights({
   const selectedSize = selected ? getSquareHitSize(selected, layout) : null
   const hoveredSize = hovered && hovered !== selected ? getSquareHitSize(hovered, layout) : null
 
-  const lift = layout.surfaceY + 0.08
+  const lift = layout.surfaceY + 0.0035
+  const highlightThickness = 0.006
 
   useFrame(({ clock }) => {
     const pulse = 0.5 + 0.5 * Math.sin(clock.elapsedTime * 8)
@@ -192,7 +174,7 @@ function SquareHighlights({
           <boxGeometry
             args={[
               selectedSize[0] * SQUARE_HIGHLIGHT_SCALE,
-              0.02,
+              highlightThickness,
               selectedSize[1] * SQUARE_HIGHLIGHT_SCALE,
             ]}
           />
@@ -211,11 +193,11 @@ function SquareHighlights({
         </mesh>
       )}
       {hoveredPos && hoveredSize && (
-        <mesh position={[hoveredPos.x, lift - 0.01, hoveredPos.z]} renderOrder={19}>
+        <mesh position={[hoveredPos.x, lift, hoveredPos.z]} renderOrder={19}>
           <boxGeometry
             args={[
               hoveredSize[0] * SQUARE_HIGHLIGHT_SCALE,
-              0.018,
+              highlightThickness * 0.9,
               hoveredSize[1] * SQUARE_HIGHLIGHT_SCALE,
             ]}
           />
@@ -251,43 +233,9 @@ function Scene({
   const squareToIdRef = useRef<Map<string, string>>(new Map())
   const idCounterRef = useRef(0)
   const captureCountRef = useRef({ white: 0, black: 0 })
-  const controlsRef = useRef<any>(null)
-  const { camera } = useThree()
 
   const pieces = useMemo(() => fenToPieces(game.fen), [game.fen])
   const layout = useMemo(() => getBoardLayout(boardSurfaceY), [boardSurfaceY])
-
-  useEffect(() => {
-    if (cameraMode !== 'fixed') return
-    const preset = CAMERA_PRESETS.find((p) => p.id === cameraAngle) ?? CAMERA_PRESETS[0]
-    camera.position.set(...preset.position)
-    camera.lookAt(0, 0, 0)
-    camera.updateProjectionMatrix()
-    if (controlsRef.current) {
-      controlsRef.current.target.set(0, 0, 0)
-      controlsRef.current.update()
-    }
-  }, [cameraMode, cameraAngle, camera])
-
-  useEffect(() => {
-    const controls = controlsRef.current
-    if (!controls) return
-    if (cameraMode === 'free') {
-      controls.enabled = true
-      controls.enableRotate = true
-      controls.enableZoom = true
-      controls.mouseButtons = {
-        LEFT: null as unknown as THREE.MOUSE,
-        MIDDLE: THREE.MOUSE.DOLLY,
-        RIGHT: THREE.MOUSE.ROTATE,
-      }
-    } else {
-      controls.enabled = false
-      controls.enableRotate = false
-      controls.enableZoom = false
-    }
-    controls.update()
-  }, [cameraMode])
 
   const initPieces = useCallback((fen: string) => {
     const next = fenToPieces(fen)
@@ -537,6 +485,7 @@ function Scene({
           x={sq.x}
           z={sq.z}
           layout={layout}
+          cameraMode={cameraMode}
           onClick={handleSquareClick}
           onHover={setHovered}
         />
@@ -546,6 +495,7 @@ function Scene({
         <AnimatedPiece
           key={piece.id}
           piece={piece}
+          cameraMode={cameraMode}
           onDone={handlePieceDone}
           onClick={handleSquareClick}
           onHover={setHovered}
@@ -563,14 +513,7 @@ function Scene({
         click piece, then destination
       </Text>
 
-      <OrbitControls
-        ref={controlsRef}
-        enablePan={false}
-        minPolarAngle={0.25}
-        maxPolarAngle={Math.PI / 2.05}
-        minDistance={9}
-        maxDistance={18}
-      />
+      <BoardCameraControls cameraMode={cameraMode} cameraAngle={cameraAngle} />
     </>
   )
 }
@@ -600,7 +543,7 @@ export function ChessBoard3D({ game, onMove, onSwitchTo2D }: Props) {
             type="button"
             className={cameraMode === 'free' ? 'active' : ''}
             onClick={() => setCameraMode('free')}
-            title="Right-click drag to rotate; scroll to zoom"
+            title="Left-click drag to rotate; scroll to zoom"
           >
             Free drag
           </button>

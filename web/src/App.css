@@ -194,6 +194,7 @@
   top: 4.5rem;
   right: 1rem;
   z-index: 20;
+  pointer-events: auto;
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
@@ -227,6 +228,7 @@
   border-radius: 999px;
   cursor: pointer;
   font-size: 0.8rem;
+  pointer-events: auto;
 }
 
 .camera-controls button.active {

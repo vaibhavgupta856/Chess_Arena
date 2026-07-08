@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { diffBoardTransition, fenToPieces } from '../lib/fen'
+import {
+  playCaptureSound,
+  playGameEndSound,
+  playMoveSound,
+} from '../lib/chessSounds'
 import type { GameState } from '../types'
 
 const API_BASE =
@@ -9,6 +15,19 @@ const API_BASE =
 export function useGame() {
   const [game, setGame] = useState<GameState | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const prevFenRef = useRef<string | null>(null)
+
+  const playMoveFeedback = useCallback((prevFen: string | null, next: GameState) => {
+    if (!prevFen || prevFen === next.fen) return
+    const { captures } = diffBoardTransition(fenToPieces(prevFen), fenToPieces(next.fen))
+    if (next.over) {
+      playGameEndSound()
+    } else if (captures.length > 0) {
+      playCaptureSound()
+    } else {
+      playMoveSound()
+    }
+  }, [])
 
   const refreshGame = useCallback(async (id: string) => {
     const res = await fetch(`${API_BASE}/games/${id}`)
@@ -34,10 +53,12 @@ export function useGame() {
         return
       }
       const data = (await res.json()) as GameState
+      playMoveFeedback(game.fen, data)
+      prevFenRef.current = data.fen
       setGame(data)
       setError(null)
     },
-    [game, refreshGame],
+    [game, playMoveFeedback, refreshGame],
   )
 
   useEffect(() => {
@@ -52,6 +73,7 @@ export function useGame() {
         }
         const data = (await res.json()) as GameState
         if (cancelled) return
+        prevFenRef.current = data.fen
         setGame(data)
 
         const wsUrl =
@@ -60,7 +82,11 @@ export function useGame() {
         socket = new WebSocket(wsUrl)
         socket.onmessage = (event) => {
           const updated = JSON.parse(event.data) as GameState
-          setGame(updated)
+          setGame((current) => {
+            playMoveFeedback(current?.fen ?? null, updated)
+            prevFenRef.current = updated.fen
+            return updated
+          })
         }
         socket.onerror = () => {
           setError('WebSocket connection failed')

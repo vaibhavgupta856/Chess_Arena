@@ -1,7 +1,9 @@
 import { useFrame } from '@react-three/fiber'
+import type { ThreeEvent } from '@react-three/fiber'
 import { Suspense, useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import type { BoardPiece } from '../types'
+import type { CameraMode } from './BoardCameraControls'
 import { GlbPiece } from './GlbPiece'
 
 export type PieceVisual = Omit<BoardPiece, 'square'> & {
@@ -20,6 +22,7 @@ export type PieceVisual = Omit<BoardPiece, 'square'> & {
 
 type AnimatedPieceProps = {
   piece: PieceVisual
+  cameraMode: CameraMode
   onDone: (id: string) => void
   onClick: (square: string) => void
   onHover: (square: string | null) => void
@@ -33,7 +36,7 @@ function isKnightType(pieceType: string) {
   return pieceType.endsWith('N')
 }
 
-export function AnimatedPiece({ piece, onDone, onClick, onHover }: AnimatedPieceProps) {
+export function AnimatedPiece({ piece, cameraMode, onDone, onClick, onHover }: AnimatedPieceProps) {
   const groupRef = useRef<THREE.Group>(null)
   const progress = useRef(piece.done ? 1 : 0)
   const start = useRef(new THREE.Vector3(piece.x, piece.y, piece.z))
@@ -104,15 +107,26 @@ export function AnimatedPiece({ piece, onDone, onClick, onHover }: AnimatedPiece
     )
   }
 
+  const freeCamera = cameraMode === 'free'
+
+  const handleSelect = (e: ThreeEvent<MouseEvent>) => {
+    if (piece.captured || !piece.square) return
+    e.stopPropagation()
+    onClick(piece.square)
+  }
+
+  const onPointerDown = (e: ThreeEvent<PointerEvent>) => {
+    if (e.button !== 0) return
+    if (piece.captured || !piece.square) return
+    e.stopPropagation()
+    onClick(piece.square)
+  }
+
   return (
     <group
       ref={groupRef}
-      onPointerDown={(e) => {
-        if (e.button !== 0) return
-        if (piece.captured || !piece.square) return
-        e.stopPropagation()
-        onClick(piece.square)
-      }}
+      onClick={freeCamera ? handleSelect : undefined}
+      onPointerDown={freeCamera ? undefined : onPointerDown}
       onPointerEnter={(e) => {
         if (piece.captured || !piece.square) return
         e.stopPropagation()
