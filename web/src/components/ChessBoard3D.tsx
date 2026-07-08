@@ -349,6 +349,12 @@ function Scene({ game, onMove }: Props) {
       <directionalLight position={[0, 5, -8]} intensity={0.35} />
       <pointLight position={[0, 10, 0]} intensity={0.5} color="#fff8ee" />
 
+      {/* Dark ground plane under the board so pieces (white + brown) stay easy to read */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.04, 0]} receiveShadow>
+        <planeGeometry args={[36, 36]} />
+        <meshStandardMaterial color="#1b2430" roughness={0.92} metalness={0.02} />
+      </mesh>
+
       <Suspense fallback={null}>
         <TileBoard onSurfaceY={setBoardSurfaceY} />
       </Suspense>
@@ -380,7 +386,7 @@ function Scene({ game, onMove }: Props) {
       <Text
         position={[0, layout.surfaceY - layout.cellSize, -layout.cellSize * 5]}
         fontSize={layout.cellSize * 0.3}
-        color="#1a3040"
+        color="#eef6ff"
         anchorX="center"
       >
         click piece, then destination
@@ -427,8 +433,8 @@ export function ChessBoard3D({ game, onMove, onSwitchTo2D }: Props) {
         </div>
       )}
       <Canvas shadows camera={{ position: [0, 10, 10], fov: 48 }}>
-        <color attach="background" args={['#B8E0F5']} />
-        <fog attach="fog" args={['#B8E0F5', 14, 28]} />
+        <color attach="background" args={['#9ec8e8']} />
+        <fog attach="fog" args={['#9ec8e8', 16, 32]} />
         <Suspense fallback={null}>
           <Scene game={game} onMove={onMove} />
         </Suspense>
