@@ -13,10 +13,8 @@ import {
   type BoardLayout,
 } from '../lib/boardLayout'
 import { buildUCI, diffBoardTransition, fenToPieces } from '../lib/fen'
-import { CASTLE_MODEL } from '../lib/castleModel'
 import { ALL_MODEL_URLS } from '../lib/models'
 import { AnimatedPiece, type PieceVisual } from './AnimatedPiece'
-import { GlbCastle } from './GlbCastle'
 import { TileBoard } from './TileBoard'
 
 type Props = {
@@ -26,7 +24,6 @@ type Props = {
 
 const SELECT_COLOR = '#5ce1ff'
 const HOVER_COLOR = '#ff9f43'
-const CASTLE_ROT_OFFSET = -Math.PI / 2
 
 function capturePosition(
   color: 'white' | 'black',
@@ -341,9 +338,6 @@ function Scene({ game, onMove }: Props) {
     setSelected(null)
   }
 
-  const a1 = layout.squares.get('a1')!
-  const a8 = layout.squares.get('a8')!
-
   return (
     <>
       <ambientLight intensity={0.75} />
@@ -353,16 +347,6 @@ function Scene({ game, onMove }: Props) {
 
       <Suspense fallback={null}>
         <TileBoard onSurfaceY={setBoardSurfaceY} />
-        <GlbCastle
-          variant="white"
-          position={[0, 0, a1.z - layout.cellSize * 3.2]}
-          rotationY={CASTLE_ROT_OFFSET}
-        />
-        <GlbCastle
-          variant="black"
-          position={[0, 0, a8.z + layout.cellSize * 3.2]}
-          rotationY={Math.PI + CASTLE_ROT_OFFSET}
-        />
       </Suspense>
 
       {allSquares(layout).map((sq) => (
@@ -390,7 +374,7 @@ function Scene({ game, onMove }: Props) {
       <SquareHighlights layout={layout} selected={selected} hovered={hovered} />
 
       <Text
-        position={[0, layout.surfaceY - layout.cellSize, a1.z - layout.cellSize * 1.6]}
+        position={[0, layout.surfaceY - layout.cellSize, -layout.cellSize * 5]}
         fontSize={layout.cellSize * 0.3}
         color="#ccc"
         anchorX="center"
@@ -411,7 +395,7 @@ function Scene({ game, onMove }: Props) {
 
 export function ChessBoard3D({ game, onMove }: Props) {
   useEffect(() => {
-    ;[...ALL_MODEL_URLS, CASTLE_MODEL].forEach((url) => useGLTF.preload(url))
+    ALL_MODEL_URLS.forEach((url) => useGLTF.preload(url))
   }, [])
 
   return (

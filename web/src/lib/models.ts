@@ -4,7 +4,6 @@ import knightModel from '../../../assets/chess_knight.glb?url'
 import pawnModel from '../../../assets/chess_pawn.glb?url'
 import rookModel from '../../../assets/chess_rook.glb?url'
 import queenModel from '../../../assets/queen_2.glb?url'
-import { FERN_TILE_MODEL, FOREST_TILE_MODEL } from './tileModels'
 
 export const PIECE_MODELS: Record<string, string> = {
   P: pawnModel,
@@ -15,8 +14,4 @@ export const PIECE_MODELS: Record<string, string> = {
   K: kingModel,
 }
 
-export const ALL_MODEL_URLS = [
-  ...Object.values(PIECE_MODELS),
-  FERN_TILE_MODEL,
-  FOREST_TILE_MODEL,
-]
+export const ALL_MODEL_URLS = [...Object.values(PIECE_MODELS)]

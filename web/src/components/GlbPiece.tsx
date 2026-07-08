@@ -28,7 +28,29 @@ export function GlbPiece({ pieceType, color }: GlbPieceProps) {
 
     const processed = scene.clone(true)
     applySideMaterials(processed, color)
-    normalizeToSize(processed, 0.9)
+
+    // Scale hierarchy: pawn < minor/rook < queen < king
+    let targetSize = 0.9
+    switch (kind) {
+      case 'P':
+        targetSize = 0.8
+        break
+      case 'N':
+      case 'B':
+      case 'R':
+        targetSize = 0.92
+        break
+      case 'Q':
+        targetSize = 1.02
+        break
+      case 'K':
+        targetSize = 1.08
+        break
+      default:
+        targetSize = 0.9
+    }
+
+    normalizeToSize(processed, targetSize)
     centerModelXZ(processed)
     templateCache.set(key, processed)
     return processed
