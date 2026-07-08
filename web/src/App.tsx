@@ -43,7 +43,11 @@ function App() {
           (view === '2d' ? (
             <ChessBoard2D game={game} onMove={submitMove} />
           ) : (
-            <ChessBoard3D game={game} onMove={submitMove} />
+            <ChessBoard3D
+              game={game}
+              onMove={submitMove}
+              onSwitchTo2D={() => setView('2d')}
+            />
           ))}
       </main>
     </div>

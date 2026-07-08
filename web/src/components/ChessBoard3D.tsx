@@ -1,6 +1,7 @@
 import { Canvas, useFrame } from '@react-three/fiber'
-import { Html, OrbitControls, Text, useGLTF, useProgress } from '@react-three/drei'
+import { OrbitControls, Text, useGLTF } from '@react-three/drei'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { usePreload3DAssets } from '../hooks/usePreload3DAssets'
 import type { ThreeEvent } from '@react-three/fiber'
 import type { MeshStandardMaterial } from 'three'
 import type { GameState } from '../types'
@@ -20,24 +21,11 @@ import { TileBoard } from './TileBoard'
 type Props = {
   game: GameState
   onMove: (uci: string) => void
+  onSwitchTo2D?: () => void
 }
 
 const SELECT_COLOR = '#5ce1ff'
 const HOVER_COLOR = '#ff9f43'
-
-function LoadingOverlay() {
-  const { active } = useProgress()
-  if (!active) return null
-
-  return (
-    <Html center>
-      <div className="loading-overlay">
-        <h2>3D assets are loading…</h2>
-        <p>Assets are loading, please wait. You can use the 2D view for now and come back to 3D.</p>
-      </div>
-    </Html>
-  )
-}
 
 function capturePosition(
   color: 'white' | 'black',
@@ -407,18 +395,41 @@ function Scene({ game, onMove }: Props) {
   )
 }
 
-export function ChessBoard3D({ game, onMove }: Props) {
+export function ChessBoard3D({ game, onMove, onSwitchTo2D }: Props) {
+  const { isLoading, progress } = usePreload3DAssets()
+
   useEffect(() => {
     ALL_MODEL_URLS.forEach((url) => useGLTF.preload(url))
   }, [])
 
   return (
     <div className="board-3d">
+      {isLoading && (
+        <div className="loading-screen" role="status" aria-live="polite">
+          <div className="loading-overlay">
+            <h2>3D assets are loading, please wait…</h2>
+            <p>Large 3D piece models are still downloading. This can take a little while on first load.</p>
+            <div className="loading-bar" aria-hidden="true">
+              <div className="loading-bar-fill" style={{ width: `${progress}%` }} />
+            </div>
+            <p className="loading-progress">{progress}% loaded</p>
+            <p className="loading-hint">
+              Want to play now? Use the 2D board while assets load, then switch back to 3D anytime.
+            </p>
+            {onSwitchTo2D && (
+              <button type="button" className="loading-switch-btn" onClick={onSwitchTo2D}>
+                Use 2D board while loading
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       <Canvas shadows camera={{ position: [0, 10, 10], fov: 48 }}>
         <color attach="background" args={['#12151c']} />
         <fog attach="fog" args={['#12151c', 14, 28]} />
-        <LoadingOverlay />
-        <Scene game={game} onMove={onMove} />
+        <Suspense fallback={null}>
+          <Scene game={game} onMove={onMove} />
+        </Suspense>
       </Canvas>
     </div>
   )
