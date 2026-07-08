@@ -40,12 +40,12 @@ export function applySideMaterials(root: THREE.Object3D, side: 'white' | 'black'
           cloned.metalness = Math.max(cloned.metalness, 0.22)
           cloned.roughness = Math.min(cloned.roughness, 0.26)
         } else {
-          // Slightly grey, still shiny so pieces are visible but distinct.
-          cloned.color.set('#555555')
-          cloned.emissive = new THREE.Color('#222222')
-          cloned.emissiveIntensity = 0.05
-          cloned.metalness = Math.max(cloned.metalness, 0.42)
-          cloned.roughness = Math.min(cloned.roughness, 0.35)
+          // Lighter grey so black side is clearly visible and distinguishable.
+          cloned.color.set('#808080')
+          cloned.emissive = new THREE.Color('#333333')
+          cloned.emissiveIntensity = 0.06
+          cloned.metalness = Math.max(cloned.metalness, 0.4)
+          cloned.roughness = Math.min(cloned.roughness, 0.32)
         }
       }
       return cloned

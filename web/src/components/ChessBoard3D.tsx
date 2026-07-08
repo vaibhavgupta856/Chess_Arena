@@ -425,8 +425,8 @@ export function ChessBoard3D({ game, onMove, onSwitchTo2D }: Props) {
         </div>
       )}
       <Canvas shadows camera={{ position: [0, 10, 10], fov: 48 }}>
-        <color attach="background" args={['#12151c']} />
-        <fog attach="fog" args={['#12151c', 14, 28]} />
+        <color attach="background" args={['#050b10']} />
+        <fog attach="fog" args={['#050b10', 14, 28]} />
         <Suspense fallback={null}>
           <Scene game={game} onMove={onMove} />
         </Suspense>
