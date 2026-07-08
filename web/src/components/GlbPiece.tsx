@@ -10,6 +10,7 @@ import {
 } from '../lib/modelUtils'
 
 const templateCache = new Map<string, THREE.Object3D>()
+const MATERIAL_VERSION = 'brown-v1'
 
 type GlbPieceProps = {
   pieceType: string
@@ -22,7 +23,7 @@ export function GlbPiece({ pieceType, color }: GlbPieceProps) {
   const { scene } = useGLTF(path)
 
   const template = useMemo(() => {
-    const key = `${kind}-${color}`
+    const key = `${kind}-${color}-${MATERIAL_VERSION}`
     const cached = templateCache.get(key)
     if (cached) return cached
 
