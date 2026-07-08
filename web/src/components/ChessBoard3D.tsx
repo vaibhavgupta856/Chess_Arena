@@ -380,7 +380,7 @@ function Scene({ game, onMove }: Props) {
       <Text
         position={[0, layout.surfaceY - layout.cellSize, -layout.cellSize * 5]}
         fontSize={layout.cellSize * 0.3}
-        color="#ccc"
+        color="#1a3040"
         anchorX="center"
       >
         click piece, then destination

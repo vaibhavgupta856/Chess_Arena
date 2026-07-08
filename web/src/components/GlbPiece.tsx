@@ -10,11 +10,28 @@ import {
 } from '../lib/modelUtils'
 
 const templateCache = new Map<string, THREE.Object3D>()
-const MATERIAL_VERSION = 'contrast-v2'
+const MATERIAL_VERSION = 'contrast-v3'
 
 type GlbPieceProps = {
   pieceType: string
   color: 'white' | 'black'
+}
+
+function pieceBaseRadius(kind: string) {
+  switch (kind) {
+    case 'P':
+      return 0.22
+    case 'N':
+    case 'B':
+    case 'R':
+      return 0.26
+    case 'Q':
+      return 0.29
+    case 'K':
+      return 0.31
+    default:
+      return 0.24
+  }
 }
 
 export function GlbPiece({ pieceType, color }: GlbPieceProps) {
@@ -58,26 +75,26 @@ export function GlbPiece({ pieceType, color }: GlbPieceProps) {
   }, [kind, scene, color])
 
   // Each piece instance needs its own Object3D (so it can have a different parent).
-  // We reuse the processed template to avoid recoloring/normalizing on every instance.
   const model = useMemo(() => template.clone(true), [template])
-
-  // Simple outline: a slightly scaled clone rendered with a dark, unlit material.
-  const outline = useMemo(() => {
-    const cloned = template.clone(true)
-    cloned.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        child.material = new THREE.MeshBasicMaterial({
-          color: '#000000',
-          side: THREE.BackSide,
-        })
-      }
-    })
-    return cloned
-  }, [template])
+  const radius = pieceBaseRadius(kind)
+  const ringColor = color === 'white' ? '#1a1a1a' : '#1f1008'
 
   return (
     <group rotation={[0, pieceFacingRotation(color), 0]}>
-      <primitive object={outline} scale={1.06} />
+      {/* Lightweight ground ring — keeps pieces readable without cloning heavy GLBs */}
+      <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={5}>
+        <ringGeometry args={[radius * 0.72, radius, 32]} />
+        <meshBasicMaterial color={ringColor} transparent opacity={0.9} depthWrite={false} />
+      </mesh>
+      <mesh position={[0, 0.008, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={4}>
+        <circleGeometry args={[radius * 0.7, 24]} />
+        <meshBasicMaterial
+          color={color === 'white' ? '#ffffff' : '#c47830'}
+          transparent
+          opacity={0.35}
+          depthWrite={false}
+        />
+      </mesh>
       <primitive object={model} castShadow receiveShadow />
     </group>
   )
