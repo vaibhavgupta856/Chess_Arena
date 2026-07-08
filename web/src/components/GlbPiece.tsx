@@ -10,7 +10,7 @@ import {
 } from '../lib/modelUtils'
 
 const templateCache = new Map<string, THREE.Object3D>()
-const MATERIAL_VERSION = 'contrast-v4'
+const MATERIAL_VERSION = 'contrast-v5'
 
 type GlbPieceProps = {
   pieceType: string
@@ -75,19 +75,19 @@ export function GlbPiece({ pieceType, color }: GlbPieceProps) {
 
   const model = useMemo(() => template.clone(true), [template])
   const radius = pieceBaseRadius(kind)
-  const fill = color === 'white' ? '#f2f2f2' : '#d48a3a'
-  const edge = color === 'white' ? '#101820' : '#3a1f0a'
+  const fill = color === 'white' ? '#ececec' : '#d48a3a'
+  const edge = color === 'white' ? '#1a2430' : '#3a1f0a'
 
   return (
     <group>
-      {/* Base markers sit outside piece rotation so every type shows a clear ring */}
-      <mesh position={[0, 0.025, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={12}>
-        <ringGeometry args={[radius * 0.62, radius, 48]} />
-        <meshBasicMaterial color={edge} transparent opacity={0.95} depthWrite={false} depthTest={false} />
+      {/* Opaque base disc — sits on the board, below the piece mesh */}
+      <mesh position={[0, 0.003, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[radius * 0.58, 32]} />
+        <meshStandardMaterial color={fill} roughness={0.7} metalness={0.04} />
       </mesh>
-      <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={11}>
-        <circleGeometry args={[radius * 0.6, 32]} />
-        <meshBasicMaterial color={fill} transparent opacity={0.55} depthWrite={false} depthTest={false} />
+      <mesh position={[0, 0.004, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[radius * 0.56, radius, 48]} />
+        <meshStandardMaterial color={edge} roughness={0.75} metalness={0.05} />
       </mesh>
 
       <group rotation={[0, pieceFacingRotation(color), 0]}>

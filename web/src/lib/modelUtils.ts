@@ -4,6 +4,8 @@ export const DEFAULT_BOARD_SURFACE_Y = 0.614
 
 const SAND_TILE = '#b8ad92'
 const GREEN_TILE = '#2a5240'
+export const BOARD_EDGE = '#3d2817'
+export const BOARD_THICKNESS = 0.45
 
 function isDarkMaterial(color: THREE.Color): boolean {
   const luminance = 0.299 * color.r + 0.587 * color.g + 0.114 * color.b
@@ -34,6 +36,8 @@ export function applySideMaterials(root: THREE.Object3D, side: 'white' | 'black'
       cloned.normalMap = null
       cloned.aoMap = null
       cloned.emissiveMap = null
+      cloned.transparent = false
+      cloned.opacity = 1
       if (
         cloned instanceof THREE.MeshStandardMaterial ||
         cloned instanceof THREE.MeshPhysicalMaterial

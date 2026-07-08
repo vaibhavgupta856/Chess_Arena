@@ -25,7 +25,7 @@ type Props = {
 }
 
 type CameraMode = 'fixed' | 'free'
-type CameraAngleId = 'white' | 'black' | 'side' | 'top'
+type CameraAngleId = 'corner' | 'white' | 'black' | 'side' | 'top'
 
 type CameraPreset = {
   id: CameraAngleId
@@ -34,8 +34,9 @@ type CameraPreset = {
 }
 
 const CAMERA_PRESETS: CameraPreset[] = [
-  { id: 'white', label: 'White side', position: [0, 10, 11] },
-  { id: 'black', label: 'Black side', position: [0, 10, -11] },
+  { id: 'corner', label: 'Corner', position: [7.5, 9.5, -7.5] },
+  { id: 'white', label: 'White side', position: [0, 10, -11] },
+  { id: 'black', label: 'Black side', position: [0, 10, 11] },
   { id: 'side', label: 'Side', position: [12, 9, 0] },
   { id: 'top', label: 'Top', position: [0, 16, 0.01] },
 ]
@@ -385,7 +386,7 @@ function Scene({
       <pointLight position={[0, 10, 0]} intensity={0.5} color="#fff8ee" />
 
       {/* Dark ground plane under the board so pieces (white + brown) stay easy to read */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.04, 0]} receiveShadow>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.52, 0]} receiveShadow>
         <planeGeometry args={[36, 36]} />
         <meshStandardMaterial color="#1b2430" roughness={0.92} metalness={0.02} />
       </mesh>
@@ -445,7 +446,7 @@ function Scene({
 export function ChessBoard3D({ game, onMove, onSwitchTo2D }: Props) {
   const { isLoading, progress } = usePreload3DAssets()
   const [cameraMode, setCameraMode] = useState<CameraMode>('fixed')
-  const [cameraAngle, setCameraAngle] = useState<CameraAngleId>('white')
+  const [cameraAngle, setCameraAngle] = useState<CameraAngleId>('corner')
 
   useEffect(() => {
     ALL_MODEL_URLS.forEach((url) => useGLTF.preload(url))
@@ -507,7 +508,7 @@ export function ChessBoard3D({ game, onMove, onSwitchTo2D }: Props) {
           </div>
         </div>
       )}
-      <Canvas shadows camera={{ position: [0, 10, 11], fov: 48 }}>
+      <Canvas shadows camera={{ position: [7.5, 9.5, -7.5], fov: 48 }}>
         <color attach="background" args={['#9ec8e8']} />
         <fog attach="fog" args={['#9ec8e8', 16, 32]} />
         <Suspense fallback={null}>
