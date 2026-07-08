@@ -1,10 +1,11 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Text, useGLTF } from '@react-three/drei'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import * as THREE from 'three'
 import { usePreload3DAssets } from '../hooks/usePreload3DAssets'
 import type { ThreeEvent } from '@react-three/fiber'
 import type { MeshStandardMaterial } from 'three'
-import type { GameState } from '../types'
+import type { GameState, BoardPiece } from '../types'
 import {
   allSquares,
   getBoardLayout,
@@ -57,6 +58,56 @@ const CAMERA_PRESETS: CameraPreset[] = [
 const SELECT_COLOR = '#5ce1ff'
 const HOVER_COLOR = '#ff9f43'
 
+function rebuildSquareMap(pieces: Map<string, PieceVisual> | PieceVisual[]) {
+  const values = pieces instanceof Map ? [...pieces.values()] : pieces
+  const squareToId = new Map<string, string>()
+  for (const piece of values) {
+    if (piece.captured || !piece.square) continue
+    squareToId.set(piece.square, piece.id)
+  }
+  return squareToId
+}
+
+function reconcileVisualPieces(
+  byId: Map<string, PieceVisual>,
+  nextBoard: ReturnType<typeof fenToPieces>,
+) {
+  const nextBySq = new Map(nextBoard.map((p) => [p.square, p]))
+
+  for (const [id, piece] of [...byId.entries()]) {
+    if (piece.captured) continue
+    if (!piece.done) continue
+    if (!piece.square) {
+      byId.delete(id)
+      continue
+    }
+    const expected = nextBySq.get(piece.square)
+    if (
+      !expected ||
+      expected.pieceType !== piece.pieceType ||
+      expected.color !== piece.color
+    ) {
+      byId.delete(id)
+    }
+  }
+
+  const winners = new Map<string, PieceVisual>()
+  for (const piece of byId.values()) {
+    if (piece.captured || !piece.square) continue
+    const existing = winners.get(piece.square)
+    if (!existing) {
+      winners.set(piece.square, piece)
+      continue
+    }
+    const keep = !existing.done ? existing : !piece.done ? piece : existing
+    const drop = keep.id === existing.id ? piece : existing
+    byId.delete(drop.id)
+    winners.set(piece.square, keep)
+  }
+
+  return rebuildSquareMap(byId)
+}
+
 function SquareHitbox({
   square,
   x,
@@ -73,6 +124,7 @@ function SquareHitbox({
   onHover: (square: string | null) => void
 }) {
   const onPointerDown = (e: ThreeEvent<PointerEvent>) => {
+    if (e.button !== 0) return
     e.stopPropagation()
     onClick(square)
   }
@@ -217,6 +269,26 @@ function Scene({
     }
   }, [cameraMode, cameraAngle, camera])
 
+  useEffect(() => {
+    const controls = controlsRef.current
+    if (!controls) return
+    if (cameraMode === 'free') {
+      controls.enabled = true
+      controls.enableRotate = true
+      controls.enableZoom = true
+      controls.mouseButtons = {
+        LEFT: null as unknown as THREE.MOUSE,
+        MIDDLE: THREE.MOUSE.DOLLY,
+        RIGHT: THREE.MOUSE.ROTATE,
+      }
+    } else {
+      controls.enabled = false
+      controls.enableRotate = false
+      controls.enableZoom = false
+    }
+    controls.update()
+  }, [cameraMode])
+
   const initPieces = useCallback((fen: string) => {
     const next = fenToPieces(fen)
     const squareToId = new Map<string, string>()
@@ -255,12 +327,31 @@ function Scene({
         const squareToId = new Map(squareToIdRef.current)
 
         const findAtSquare = (square: string) => {
+          const onSquare = [...byId.values()].find(
+            (p) => !p.captured && p.square === square,
+          )
+          if (onSquare) return onSquare
+
           const mappedId = squareToId.get(square)
-          if (mappedId) {
-            const mapped = byId.get(mappedId)
-            if (mapped && !mapped.captured) return mapped
-          }
-          return [...byId.values()].find((p) => !p.captured && p.square === square)
+          if (!mappedId) return undefined
+          const mapped = byId.get(mappedId)
+          if (mapped && !mapped.captured && mapped.square === square) return mapped
+          return undefined
+        }
+
+        const findMover = (from: string, boardPiece: BoardPiece) => {
+          const atFrom = findAtSquare(from)
+          if (atFrom) return atFrom
+
+          const candidates = [...byId.values()].filter(
+            (p) =>
+              !p.captured &&
+              p.color === boardPiece.color &&
+              (p.pieceType === boardPiece.pieceType ||
+                (p.pieceType.endsWith('P') && boardPiece.pieceType.endsWith('Q'))),
+          )
+          if (candidates.length !== 1) return undefined
+          return candidates[0]
         }
 
         const sendToValhalla = (piece: PieceVisual, fromSquare: string) => {
@@ -290,32 +381,32 @@ function Scene({
             sendToValhalla(victim, move.to)
           }
 
-          const id = squareToId.get(move.from)
-          let piece = id ? byId.get(id) : findAtSquare(move.from)
+          const piece = findMover(move.from, move.piece)
           if (!piece || piece.captured) continue
 
           const [tx, ty, tz] = squareToWorld(move.to, layout)
+          if (piece.square && piece.square !== move.from) {
+            squareToId.delete(piece.square)
+          }
+          squareToId.delete(move.from)
           piece.square = move.to
           piece.pieceType = move.piece.pieceType
           piece.targetX = tx
           piece.targetY = ty
           piece.targetZ = tz
           piece.done = false
-          squareToId.delete(move.from)
           squareToId.set(move.to, piece.id)
         }
 
         for (const boardPiece of next) {
           const alreadyThere = [...byId.values()].some(
-            (p) => !p.captured && p.square === boardPiece.square,
+            (p) =>
+              !p.captured &&
+              p.square === boardPiece.square &&
+              p.pieceType === boardPiece.pieceType &&
+              p.color === boardPiece.color,
           )
           if (alreadyThere) continue
-
-          const existingId = squareToId.get(boardPiece.square)
-          if (existingId && byId.has(existingId)) {
-            const existing = byId.get(existingId)!
-            if (!existing.captured) continue
-          }
 
           const id = `p${idCounterRef.current++}`
           const [x, y, z] = squareToWorld(boardPiece.square, layout)
@@ -335,7 +426,7 @@ function Scene({
           squareToId.set(boardPiece.square, id)
         }
 
-        squareToIdRef.current = squareToId
+        squareToIdRef.current = reconcileVisualPieces(byId, next)
         return [...byId.values()]
       })
 
@@ -382,8 +473,8 @@ function Scene({
   }, [layout])
 
   const handlePieceDone = useCallback((id: string) => {
-    setVisualPieces((current) =>
-      current.map((p) => {
+    setVisualPieces((current) => {
+      const next = current.map((p) => {
         if (p.id !== id) return p
         return {
           ...p,
@@ -392,9 +483,12 @@ function Scene({
           z: p.targetZ,
           done: true,
         }
-      }),
-    )
-  }, [])
+      })
+      const byId = new Map(next.map((p) => [p.id, p]))
+      squareToIdRef.current = reconcileVisualPieces(byId, fenToPieces(game.fen))
+      return [...byId.values()]
+    })
+  }, [game.fen])
 
   const handleSquareClick = (square: string) => {
     if (game.over) return
@@ -471,9 +565,6 @@ function Scene({
 
       <OrbitControls
         ref={controlsRef}
-        enabled={cameraMode === 'free'}
-        enableRotate={cameraMode === 'free'}
-        enableZoom={cameraMode === 'free'}
         enablePan={false}
         minPolarAngle={0.25}
         maxPolarAngle={Math.PI / 2.05}
@@ -509,6 +600,7 @@ export function ChessBoard3D({ game, onMove, onSwitchTo2D }: Props) {
             type="button"
             className={cameraMode === 'free' ? 'active' : ''}
             onClick={() => setCameraMode('free')}
+            title="Right-click drag to rotate; scroll to zoom"
           >
             Free drag
           </button>

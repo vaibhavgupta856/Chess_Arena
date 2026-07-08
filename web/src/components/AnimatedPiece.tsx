@@ -108,6 +108,7 @@ export function AnimatedPiece({ piece, onDone, onClick, onHover }: AnimatedPiece
     <group
       ref={groupRef}
       onPointerDown={(e) => {
+        if (e.button !== 0) return
         if (piece.captured || !piece.square) return
         e.stopPropagation()
         onClick(piece.square)
