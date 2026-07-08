@@ -254,16 +254,20 @@ function Scene({
         const byId = new Map(current.map((p) => [p.id, { ...p }]))
         const squareToId = new Map(squareToIdRef.current)
 
-        for (const captured of captures) {
-          const id = squareToId.get(captured.square)
-          if (!id) continue
-          const piece = byId.get(id)
-          if (!piece) continue
+        const findAtSquare = (square: string) => {
+          const mappedId = squareToId.get(square)
+          if (mappedId) {
+            const mapped = byId.get(mappedId)
+            if (mapped && !mapped.captured) return mapped
+          }
+          return [...byId.values()].find((p) => !p.captured && p.square === square)
+        }
 
-          const idx = captureCountRef.current[captured.color]
-          captureCountRef.current[captured.color] += 1
-          const [tx, ty, tz] = valhallaSlotPosition(captured.color, idx, layout)
-
+        const sendToValhalla = (piece: PieceVisual, fromSquare: string) => {
+          if (piece.captured) return
+          const idx = captureCountRef.current[piece.color]
+          captureCountRef.current[piece.color] += 1
+          const [tx, ty, tz] = valhallaSlotPosition(piece.color, idx, layout)
           piece.captured = true
           piece.valhallaIndex = idx
           piece.square = null
@@ -271,14 +275,24 @@ function Scene({
           piece.targetY = ty
           piece.targetZ = tz
           piece.done = false
-          squareToId.delete(captured.square)
+          squareToId.delete(fromSquare)
+        }
+
+        for (const captured of captures) {
+          const piece = findAtSquare(captured.square)
+          if (!piece) continue
+          sendToValhalla(piece, captured.square)
         }
 
         for (const move of moves) {
+          const victim = findAtSquare(move.to)
+          if (victim && victim.color !== move.piece.color) {
+            sendToValhalla(victim, move.to)
+          }
+
           const id = squareToId.get(move.from)
-          if (!id) continue
-          const piece = byId.get(id)
-          if (!piece) continue
+          let piece = id ? byId.get(id) : findAtSquare(move.from)
+          if (!piece || piece.captured) continue
 
           const [tx, ty, tz] = squareToWorld(move.to, layout)
           piece.square = move.to
@@ -288,12 +302,20 @@ function Scene({
           piece.targetZ = tz
           piece.done = false
           squareToId.delete(move.from)
-          squareToId.set(move.to, id)
+          squareToId.set(move.to, piece.id)
         }
 
         for (const boardPiece of next) {
+          const alreadyThere = [...byId.values()].some(
+            (p) => !p.captured && p.square === boardPiece.square,
+          )
+          if (alreadyThere) continue
+
           const existingId = squareToId.get(boardPiece.square)
-          if (existingId && byId.has(existingId)) continue
+          if (existingId && byId.has(existingId)) {
+            const existing = byId.get(existingId)!
+            if (!existing.captured) continue
+          }
 
           const id = `p${idCounterRef.current++}`
           const [x, y, z] = squareToWorld(boardPiece.square, layout)
@@ -322,14 +344,24 @@ function Scene({
     [layout],
   )
 
+  const gameIdRef = useRef(game.id)
+
   useEffect(() => {
+    if (gameIdRef.current !== game.id) {
+      gameIdRef.current = game.id
+      prevFenRef.current = null
+      idCounterRef.current = 0
+      captureCountRef.current = { white: 0, black: 0 }
+      initPieces(game.fen)
+      return
+    }
     if (!prevFenRef.current) {
       initPieces(game.fen)
       return
     }
     if (prevFenRef.current === game.fen) return
     animateTransition(prevFenRef.current, game.fen)
-  }, [game.fen, initPieces, animateTransition])
+  }, [game.id, game.fen, initPieces, animateTransition])
 
   useEffect(() => {
     if (!prevFenRef.current) return

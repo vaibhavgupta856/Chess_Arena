@@ -72,6 +72,10 @@ export type BoardTransition = {
   captures: BoardPiece[]
 }
 
+function samePiece(a: BoardPiece, b: BoardPiece) {
+  return a.square === b.square && a.pieceType === b.pieceType && a.color === b.color
+}
+
 export function diffBoardTransition(prev: BoardPiece[], next: BoardPiece[]): BoardTransition {
   const prevBySq = new Map(prev.map((p) => [p.square, p]))
   const nextBySq = new Map(next.map((p) => [p.square, p]))
@@ -96,7 +100,7 @@ export function diffBoardTransition(prev: BoardPiece[], next: BoardPiece[]): Boa
   const moves: BoardTransition['moves'] = []
   const captures: BoardPiece[] = []
   const usedFrom = new Set<string>()
-  const usedTo = new Set<string>()
+  const capturedSquares = new Set<string>()
 
   for (const toPiece of appeared) {
     const match = disappeared.find(
@@ -107,14 +111,26 @@ export function diffBoardTransition(prev: BoardPiece[], next: BoardPiece[]): Boa
           (fromPiece.pieceType.endsWith('P') && toPiece.pieceType.endsWith('Q'))),
     )
     if (!match) continue
+
     usedFrom.add(match.square)
-    usedTo.add(toPiece.square)
     moves.push({ from: match.square, to: toPiece.square, piece: toPiece })
+
+    const victim = prevBySq.get(toPiece.square)
+    if (victim && victim.color !== toPiece.color) {
+      capturedSquares.add(victim.square)
+    }
   }
 
   for (const fromPiece of disappeared) {
     if (usedFrom.has(fromPiece.square)) continue
     captures.push(fromPiece)
+  }
+
+  for (const sq of capturedSquares) {
+    const victim = prevBySq.get(sq)
+    if (!victim) continue
+    if (captures.some((c) => samePiece(c, victim))) continue
+    captures.push(victim)
   }
 
   return { moves, captures }

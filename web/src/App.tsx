@@ -39,16 +39,20 @@ function App() {
         {error && <p className="error">{error}</p>}
       </header>
       <main className={`board-container${is3d ? ' board-container--fullscreen' : ''}`}>
-        {game &&
-          (view === '2d' ? (
-            <ChessBoard2D game={game} onMove={submitMove} />
-          ) : (
-            <ChessBoard3D
-              game={game}
-              onMove={submitMove}
-              onSwitchTo2D={() => setView('2d')}
-            />
-          ))}
+        {game && (
+          <>
+            <div className={`board-view${view === '2d' ? '' : ' board-view--hidden'}`}>
+              <ChessBoard2D game={game} onMove={submitMove} />
+            </div>
+            <div className={`board-view${view === '3d' ? ' board-view--fullscreen' : ' board-view--hidden'}`}>
+              <ChessBoard3D
+                game={game}
+                onMove={submitMove}
+                onSwitchTo2D={() => setView('2d')}
+              />
+            </div>
+          </>
+        )}
       </main>
     </div>
   )

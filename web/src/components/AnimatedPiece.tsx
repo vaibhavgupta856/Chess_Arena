@@ -55,8 +55,20 @@ export function AnimatedPiece({ piece, onDone, onClick, onHover }: AnimatedPiece
       start.current.set(piece.x, piece.y, piece.z)
       target.current.set(piece.targetX, piece.targetY, piece.targetZ)
       reported.current = false
+      return
     }
-  }, [piece.done, piece.x, piece.y, piece.z, piece.targetX, piece.targetY, piece.targetZ])
+    progress.current = 1
+    reported.current = true
+  }, [
+    piece.done,
+    piece.x,
+    piece.y,
+    piece.z,
+    piece.targetX,
+    piece.targetY,
+    piece.targetZ,
+    piece.id,
+  ])
 
   useFrame((_, delta) => {
     if (!groupRef.current) return
