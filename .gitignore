@@ -31,4 +31,7 @@ go.work.sum
 .DS_Store
 Thumbs.db
 .vercel
+.vercel/**
+web/.vercel
+web/.vercel/**
 .env*
