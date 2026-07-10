@@ -1,7 +1,6 @@
 import { Canvas, useFrame } from '@react-three/fiber'
 import { Text } from '@react-three/drei'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ThreeEvent } from '@react-three/fiber'
 import type { MeshStandardMaterial } from 'three'
 import type { GameState, BoardPiece } from '../types'
 import {
@@ -18,6 +17,8 @@ import { AnimatedPiece, type PieceVisual } from './AnimatedPiece'
 import { BoardCameraControls, CAMERA_PRESETS, type CameraAngleId, type CameraMode } from './BoardCameraControls'
 import { TileBoard } from './TileBoard'
 import { ValhallaPlatforms } from './ValhallaPlatforms'
+import { useTheme } from '../hooks/useTheme'
+import type { BoardTheme } from '../lib/themes'
 
 type Props = {
   game: GameState
@@ -26,9 +27,6 @@ type Props = {
   canMove: boolean
   onMove: (uci: string) => void
 }
-
-const SELECT_COLOR = '#5ce1ff'
-const HOVER_COLOR = '#ff9f43'
 
 function rebuildSquareMap(pieces: Map<string, PieceVisual> | PieceVisual[]) {
   const values = pieces instanceof Map ? [...pieces.values()] : pieces
@@ -85,7 +83,6 @@ function SquareHitbox({
   x,
   z,
   layout,
-  cameraMode,
   onClick,
   onHover,
 }: {
@@ -93,30 +90,19 @@ function SquareHitbox({
   x: number
   z: number
   layout: BoardLayout
-  cameraMode: CameraMode
   onClick: (square: string) => void
   onHover: (square: string | null) => void
 }) {
-  const handleSelect = (e: ThreeEvent<MouseEvent>) => {
-    e.stopPropagation()
-    onClick(square)
-  }
-
-  const onPointerDown = (e: ThreeEvent<PointerEvent>) => {
-    if (e.button !== 0) return
-    e.stopPropagation()
-    onClick(square)
-  }
-
   const hitY = layout.surfaceY + 0.04
   const [hitW, hitD] = getSquareHitSize(square, layout)
-  const freeCamera = cameraMode === 'free'
 
   return (
     <mesh
       position={[x, hitY, z]}
-      onClick={freeCamera ? handleSelect : undefined}
-      onPointerDown={freeCamera ? undefined : onPointerDown}
+      onClick={(e) => {
+        e.stopPropagation()
+        onClick(square)
+      }}
       onPointerEnter={(e) => {
         e.stopPropagation()
         onHover(square)
@@ -136,10 +122,12 @@ function SquareHighlights({
   layout,
   selected,
   hovered,
+  theme,
 }: {
   layout: BoardLayout
   selected: string | null
   hovered: string | null
+  theme: BoardTheme
 }) {
   const selectMat = useRef<MeshStandardMaterial>(null)
   const hoverMat = useRef<MeshStandardMaterial>(null)
@@ -180,10 +168,10 @@ function SquareHighlights({
           />
           <meshStandardMaterial
             ref={selectMat}
-            color={SELECT_COLOR}
+            color={theme.highlightSelect}
             transparent
             opacity={0.6}
-            emissive={SELECT_COLOR}
+            emissive={theme.highlightSelect}
             emissiveIntensity={0.55}
             roughness={0.35}
             metalness={0.2}
@@ -203,10 +191,10 @@ function SquareHighlights({
           />
           <meshStandardMaterial
             ref={hoverMat}
-            color={HOVER_COLOR}
+            color={theme.highlightHover}
             transparent
             opacity={0.45}
-            emissive={HOVER_COLOR}
+            emissive={theme.highlightHover}
             emissiveIntensity={0.4}
             roughness={0.45}
             metalness={0.15}
@@ -227,7 +215,8 @@ function Scene({
   onMove,
   cameraMode,
   cameraAngle,
-}: Props & { cameraMode: CameraMode; cameraAngle: CameraAngleId }) {
+  theme,
+}: Props & { cameraMode: CameraMode; cameraAngle: CameraAngleId; theme: BoardTheme }) {
   const [selected, setSelected] = useState<string | null>(null)
   const [hovered, setHovered] = useState<string | null>(null)
   const [boardSurfaceY, setBoardSurfaceY] = useState(0.06)
@@ -470,7 +459,8 @@ function Scene({
       return
     }
 
-    onMove(buildUCI(selected, square, turn))
+    const moving = pieces.find((p) => p.square === selected)
+    onMove(buildUCI(selected, square, turn, moving?.pieceType))
     setSelected(null)
   }
 
@@ -486,11 +476,11 @@ function Scene({
       {/* Dark ground plane under the board so pieces (white + brown) stay easy to read */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.52, 0]} receiveShadow>
         <planeGeometry args={[36, 36]} />
-        <meshStandardMaterial color="#1b2430" roughness={0.92} metalness={0.02} />
+        <meshStandardMaterial color={theme.ground} roughness={0.92} metalness={0.02} />
       </mesh>
 
       <Suspense fallback={null}>
-        <TileBoard onSurfaceY={setBoardSurfaceY} />
+        <TileBoard theme={theme} onSurfaceY={setBoardSurfaceY} />
         <ValhallaPlatforms layout={layout} />
       </Suspense>
 
@@ -501,7 +491,6 @@ function Scene({
           x={sq.x}
           z={sq.z}
           layout={layout}
-          cameraMode={cameraMode}
           onClick={handleSquareClick}
           onHover={setHovered}
         />
@@ -511,14 +500,13 @@ function Scene({
         <AnimatedPiece
           key={piece.id}
           piece={piece}
-          cameraMode={cameraMode}
           onDone={handlePieceDone}
           onClick={handleSquareClick}
           onHover={setHovered}
         />
       ))}
 
-      <SquareHighlights layout={layout} selected={selected} hovered={hovered} />
+      <SquareHighlights layout={layout} selected={selected} hovered={hovered} theme={theme} />
 
       <Text
         position={[0, layout.surfaceY - layout.cellSize, -layout.cellSize * 5]}
@@ -535,7 +523,8 @@ function Scene({
 }
 
 export function ChessBoard3D({ game, displayFen, atLivePosition, canMove, onMove }: Props) {
-  const [cameraMode, setCameraMode] = useState<CameraMode>('fixed')
+  const { theme } = useTheme()
+  const [cameraMode, setCameraMode] = useState<CameraMode>('free')
   const [cameraAngle, setCameraAngle] = useState<CameraAngleId>('corner-ne')
 
   return (
@@ -555,7 +544,7 @@ export function ChessBoard3D({ game, displayFen, atLivePosition, canMove, onMove
               type="button"
               className={cameraMode === 'free' ? 'active' : ''}
               onClick={() => setCameraMode('free')}
-              title="Left-click drag to rotate; scroll to zoom"
+              title="Drag to rotate; click a piece then a square to move; scroll to zoom"
             >
               Free drag
             </button>
@@ -577,9 +566,17 @@ export function ChessBoard3D({ game, displayFen, atLivePosition, canMove, onMove
         </div>
       </div>
 
-      <Canvas className="board-3d-canvas" shadows camera={{ position: [7.5, 9.5, -7.5], fov: 48 }}>
-        <color attach="background" args={['#9ec8e8']} />
-        <fog attach="fog" args={['#9ec8e8', 16, 32]} />
+      <Canvas
+        className="board-3d-canvas"
+        shadows
+        camera={{ position: [7.5, 9.5, -7.5], fov: 48 }}
+        onPointerDown={(e) => {
+          if (e.button === 2) e.preventDefault()
+        }}
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        <color attach="background" args={[theme.background]} />
+        <fog attach="fog" args={[theme.fog, 16, 32]} />
         <Suspense fallback={null}>
           <Scene
             game={game}
@@ -589,6 +586,7 @@ export function ChessBoard3D({ game, displayFen, atLivePosition, canMove, onMove
             onMove={onMove}
             cameraMode={cameraMode}
             cameraAngle={cameraAngle}
+            theme={theme}
           />
         </Suspense>
       </Canvas>

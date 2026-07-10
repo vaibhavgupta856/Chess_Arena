@@ -10,7 +10,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/conan/chessarena/internal/auth"
 	"github.com/conan/chessarena/internal/chess"
+	"github.com/conan/chessarena/internal/store"
 	"github.com/gorilla/websocket"
 )
 
@@ -18,6 +20,8 @@ type server struct {
 	mu       sync.RWMutex
 	sessions map[string]*gameSession
 	subs     map[string]map[*websocket.Conn]struct{}
+	store    *store.Store
+	auth     *auth.Service
 }
 
 type moveRecordJSON struct {
@@ -45,12 +49,18 @@ type gameState struct {
 	WaitingFor     string           `json:"waitingFor,omitempty"`
 	DrawOfferBy    string           `json:"drawOfferBy,omitempty"`
 	ClaimableDraws []string         `json:"claimableDraws,omitempty"`
+	BotThinking    bool             `json:"botThinking,omitempty"`
+	BotLevel       string           `json:"botLevel,omitempty"`
+	BotElo         int              `json:"botElo,omitempty"`
+	WhiteEloDelta  int              `json:"whiteEloDelta,omitempty"`
+	BlackEloDelta  int              `json:"blackEloDelta,omitempty"`
 }
 
 type createGameRequest struct {
 	Mode     string `json:"mode"`
 	PlayAs   string `json:"playAs"`
 	ClientID string `json:"clientId"`
+	BotLevel string `json:"botLevel"`
 }
 
 type joinRequest struct {
@@ -89,17 +99,27 @@ func (s *server) newGameHandler(w http.ResponseWriter, r *http.Request) {
 		mode = "local"
 	}
 	id := s.nextID()
-	session := newSession(id, mode, req.PlayAs, req.ClientID)
-	if err := session.maybeBotMove(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+	level := chess.ParseBotLevel(req.BotLevel)
+	// Bot/local seats use the browser clientId so moves match.
+	// Online prefers the logged-in user id when present.
+	playerID := req.ClientID
+	if mode == "online" {
+		playerID = s.playerIDForGame(r, req.ClientID)
 	}
+	if playerID == "" {
+		playerID = s.playerIDForGame(r, req.ClientID)
+	}
+	session := newSession(id, mode, req.PlayAs, playerID, level)
 
 	s.mu.Lock()
 	s.sessions[id] = session
 	s.mu.Unlock()
 
-	writeJSON(w, http.StatusCreated, s.encodeState(session, req.ClientID))
+	if s.botShouldSchedule(session) {
+		s.scheduleBotMove(id)
+	}
+
+	writeJSON(w, http.StatusCreated, s.encodeState(session, playerID))
 }
 
 func (s *server) getSession(id string) (*gameSession, bool) {
@@ -190,15 +210,21 @@ func (s *server) moveHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
-	if !session.canMove(req.ClientID) {
+	moverID := s.playerIDForGame(r, req.ClientID)
+	if !session.canMove(moverID) && !session.canMove(req.ClientID) {
 		http.Error(w, "not your turn", http.StatusForbidden)
 		return
 	}
+	if session.canMove(req.ClientID) {
+		moverID = req.ClientID
+	}
 
+	session.mu.Lock()
 	g := session.game
 	var err error
 	switch {
 	case req.UCI != "" && req.SAN != "":
+		session.mu.Unlock()
 		http.Error(w, "specify either uci or san, not both", http.StatusBadRequest)
 		return
 	case req.UCI != "":
@@ -206,21 +232,27 @@ func (s *server) moveHandler(w http.ResponseWriter, r *http.Request) {
 	case req.SAN != "":
 		err = g.ApplySANMove(req.SAN)
 	default:
+		session.mu.Unlock()
 		http.Error(w, "missing move (uci or san)", http.StatusBadRequest)
 		return
 	}
 	if err != nil {
+		session.mu.Unlock()
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	session.drawOfferBy = chess.NoColor
-	if err := session.maybeBotMove(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+	session.mu.Unlock()
+	s.cancelBotMove(session)
+
+	if session.game.IsOver() {
+		s.applyOnlineRatings(session)
+	} else if s.botShouldSchedule(session) {
+		s.scheduleBotMove(id)
 	}
 
 	s.broadcast(id)
-	writeJSON(w, http.StatusOK, s.encodeState(session, req.ClientID))
+	writeJSON(w, http.StatusOK, s.encodeState(session, moverID))
 }
 
 func (s *server) legalMovesHandler(w http.ResponseWriter, r *http.Request) {
@@ -287,7 +319,11 @@ func (s *server) resignHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	session.mu.Lock()
 	session.drawOfferBy = chess.NoColor
+	session.mu.Unlock()
+	s.cancelBotMove(session)
+	s.applyOnlineRatings(session)
 	s.broadcast(id)
 	writeJSON(w, http.StatusOK, s.encodeState(session, req.ClientID))
 }
@@ -345,6 +381,9 @@ func (s *server) drawHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if session.game.IsOver() {
+		s.applyOnlineRatings(session)
+	}
 	s.broadcast(id)
 	writeJSON(w, http.StatusOK, s.encodeState(session, req.ClientID))
 }
@@ -380,6 +419,9 @@ func (s *server) drawResponseHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	if session.game.IsOver() {
+		s.applyOnlineRatings(session)
+	}
 	s.broadcast(id)
 	writeJSON(w, http.StatusOK, s.encodeState(session, req.ClientID))
 }
@@ -405,6 +447,13 @@ func (s *server) nextID() string {
 }
 
 func (s *server) encodeState(session *gameSession, clientID string) gameState {
+	session.mu.Lock()
+	botThinking := session.botThinking
+	botLevel := session.botLevel
+	whiteDelta := session.whiteDelta
+	blackDelta := session.blackDelta
+	session.mu.Unlock()
+
 	g := session.game
 	history := g.MoveHistory()
 	records := make([]moveRecordJSON, 0, len(history))
@@ -469,6 +518,11 @@ func (s *server) encodeState(session *gameSession, clientID string) gameState {
 		WaitingFor:     waiting,
 		DrawOfferBy:    drawOffer,
 		ClaimableDraws: claims,
+		BotThinking:    botThinking,
+		BotLevel:       string(botLevel),
+		BotElo:         botLevel.Elo(),
+		WhiteEloDelta:  whiteDelta,
+		BlackEloDelta:  blackDelta,
 	}
 }
 
@@ -521,11 +575,36 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 func main() {
 	rand.Seed(time.Now().UnixNano())
 	s := newServer()
+	s.auth = auth.NewService()
+
+	dbPath := os.Getenv("DATABASE_PATH")
+	if dbPath == "" {
+		dbPath = "data/chessarena.db"
+	}
+	st, err := store.Open(dbPath)
+	if err != nil {
+		log.Printf("warning: database unavailable (%v) — accounts disabled", err)
+	} else {
+		s.store = st
+		log.Printf("database opened at %s", dbPath)
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
+	mux.HandleFunc("POST /auth/register", s.registerHandler)
+	mux.HandleFunc("POST /auth/login", s.loginHandler)
+	mux.HandleFunc("GET /users/me", s.meHandler)
+	mux.HandleFunc("PATCH /users/me", s.updateProfileHandler)
+	mux.HandleFunc("GET /users/search", s.searchUsersHandler)
+	mux.HandleFunc("GET /users/{id}", s.getUserHandler)
+	mux.HandleFunc("GET /leaderboard", s.leaderboardHandler)
+	mux.HandleFunc("POST /friends/request", s.friendRequestHandler)
+	mux.HandleFunc("POST /friends/respond", s.friendRespondHandler)
+	mux.HandleFunc("GET /friends", s.friendsListHandler)
+	mux.HandleFunc("POST /friends/challenge", s.friendChallengeHandler)
+	mux.HandleFunc("POST /friends/challenge/{id}/accept", s.acceptChallengeHandler)
 	mux.HandleFunc("POST /games", s.newGameHandler)
 	mux.HandleFunc("GET /games/{id}", s.gameStateHandler)
 	mux.HandleFunc("POST /games/{id}/join", s.joinHandler)
@@ -534,6 +613,8 @@ func main() {
 	mux.HandleFunc("POST /games/{id}/resign", s.resignHandler)
 	mux.HandleFunc("POST /games/{id}/draw", s.drawHandler)
 	mux.HandleFunc("POST /games/{id}/draw/respond", s.drawResponseHandler)
+	mux.HandleFunc("POST /games/{id}/coach/hint", s.coachHintHandler)
+	mux.HandleFunc("POST /games/{id}/coach/analyze", s.coachAnalyzeHandler)
 	mux.HandleFunc("GET /ws/games/{id}", s.wsHandler)
 
 	port := os.Getenv("PORT")
@@ -544,8 +625,8 @@ func main() {
 	log.Printf("chess server listening on %s", addr)
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PATCH,OPTIONS")
 		if r.Method == http.MethodOptions {
 			return
 		}

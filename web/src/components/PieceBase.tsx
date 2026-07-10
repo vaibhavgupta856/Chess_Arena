@@ -1,12 +1,15 @@
+import type { BoardTheme } from '../lib/themes'
+
 type PieceBaseProps = {
   kind: string
   color: 'white' | 'black'
   radius: number
+  theme: BoardTheme
 }
 
-export function PieceBase({ kind, color, radius }: PieceBaseProps) {
-  const fill = color === 'white' ? '#ececec' : '#d48a3a'
-  const edge = color === 'white' ? '#1a2430' : '#3a1f0a'
+export function PieceBase({ kind, color, radius, theme }: PieceBaseProps) {
+  const fill = color === 'white' ? theme.pieceBaseLight : theme.pieceBaseDark
+  const edge = color === 'white' ? theme.pieceRingLight : theme.pieceRingDark
 
   if (kind === 'B') {
     return (

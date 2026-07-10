@@ -6,6 +6,10 @@
 *.dylib
 /bin/
 /dist/
+/server
+
+# Local database
+/data/
 
 # Test
 *.test

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import type { CreateGameOptions, GameMode } from '../types'
+import type { BotLevel, CreateGameOptions, GameMode, UserProfile } from '../types'
+import { BOT_LEVELS } from '../types'
 
 type Props = {
   onCreate: (options: CreateGameOptions) => Promise<void>
@@ -7,12 +8,47 @@ type Props = {
   error: string | null
   apiBase: string
   checkServerHealth: () => Promise<boolean>
+  user: UserProfile | null
+  onOpenAuth: () => void
+  onOpenProfile: () => void
+  onOpenFriends: () => void
+  onOpenLeaderboard: () => void
 }
 
-export function GameLobby({ onCreate, onJoin, error, apiBase, checkServerHealth }: Props) {
+const MODE_META: Record<string, { icon: string; accent: string }> = {
+  bot: { icon: '🤖', accent: 'lobby-card--violet' },
+  'bot-black': { icon: '♟️', accent: 'lobby-card--amber' },
+  online: { icon: '🌐', accent: 'lobby-card--cyan' },
+  local: { icon: '👥', accent: 'lobby-card--green' },
+}
+
+const FEATURES = [
+  'Check & mate',
+  'Castling',
+  'En passant',
+  'Draw offers',
+  'Move history',
+  '2D / 3D',
+  'Coach hints',
+  'Friend matches',
+]
+
+export function GameLobby({
+  onCreate,
+  onJoin,
+  error,
+  apiBase,
+  checkServerHealth,
+  user,
+  onOpenAuth,
+  onOpenProfile,
+  onOpenFriends,
+  onOpenLeaderboard,
+}: Props) {
   const [joinId, setJoinId] = useState('')
   const [busy, setBusy] = useState(false)
   const [serverOk, setServerOk] = useState<boolean | null>(null)
+  const [botLevel, setBotLevel] = useState<BotLevel>('casual')
 
   useEffect(() => {
     let cancelled = false
@@ -40,78 +76,167 @@ export function GameLobby({ onCreate, onJoin, error, apiBase, checkServerHealth 
 
   const canPlay = serverOk === true
 
-  const modeCard = (mode: GameMode, title: string, desc: string, playAs?: 'white' | 'black') => (
-    <button
-      type="button"
-      className="lobby-card"
-      disabled={busy || !canPlay}
-      onClick={() => run(() => onCreate({ mode, playAs }))}
-    >
-      <strong>{title}</strong>
-      <span>{desc}</span>
-    </button>
-  )
+  const modeCard = (
+    key: string,
+    mode: GameMode,
+    title: string,
+    desc: string,
+    playAs?: 'white' | 'black',
+    delayClass?: string,
+  ) => {
+    const meta = MODE_META[key] ?? MODE_META.bot
+    const isBot = mode === 'bot'
+    return (
+      <button
+        key={key}
+        type="button"
+        className={`lobby-card ${meta.accent} lobby-anim ${delayClass ?? ''}`}
+        disabled={busy || !canPlay}
+        onClick={() =>
+          run(() => onCreate({ mode, playAs, botLevel: isBot ? botLevel : undefined }))
+        }
+      >
+        <span className="lobby-card-icon" aria-hidden>
+          {meta.icon}
+        </span>
+        <strong>{title}</strong>
+        <span>{desc}</span>
+        {isBot && (
+          <span className="lobby-card-level">
+            {BOT_LEVELS.find((l) => l.id === botLevel)?.label} (~
+            {BOT_LEVELS.find((l) => l.id === botLevel)?.elo} ELO)
+          </span>
+        )}
+      </button>
+    )
+  }
 
   return (
     <div className="lobby">
-      <div className="lobby-hero">
-        <h2>Play Chess</h2>
-        <p>Choose a mode below. Use <strong>2D</strong> for instant pieces, or <strong>3D</strong> after models finish loading (~180MB first visit).</p>
-      </div>
+      <nav className="lobby-nav lobby-panel lobby-anim lobby-anim--delay-1">
+        {user ? (
+          <>
+            <span className="lobby-user-pill">
+              {user.displayName} · {user.eloRating} ELO
+            </span>
+            <div className="lobby-nav-actions">
+              <button type="button" className="sidebar-btn" onClick={onOpenProfile}>
+                Profile
+              </button>
+              <button type="button" className="sidebar-btn" onClick={onOpenFriends}>
+                Friends
+              </button>
+              <button type="button" className="sidebar-btn" onClick={onOpenLeaderboard}>
+                Leaderboard
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="lobby-nav-actions">
+            <button type="button" className="lobby-join-btn" onClick={onOpenAuth}>
+              Sign in / Register
+            </button>
+            <button type="button" className="sidebar-btn" onClick={onOpenLeaderboard}>
+              Leaderboard
+            </button>
+          </div>
+        )}
+      </nav>
 
-      <div className={`server-status${serverOk === true ? ' server-status--ok' : serverOk === false ? ' server-status--bad' : ''}`}>
+      <section className="lobby-hero lobby-panel lobby-anim lobby-anim--delay-2">
+        <div className="lobby-hero-badges">
+          <span className="lobby-badge">2D &amp; 3D</span>
+          <span className="lobby-badge">Online rooms</span>
+          <span className="lobby-badge">Vs bot</span>
+          <span className="lobby-badge">Coach</span>
+        </div>
+        <h2>Choose your battlefield</h2>
+        <p>
+          Instant procedural 3D pieces, adjustable bot strength, live multiplayer, and a built-in
+          coach — pick a mode and play in seconds.
+        </p>
+      </section>
+
+      <div
+        className={`server-status lobby-panel lobby-anim lobby-anim--delay-3${serverOk === true ? ' server-status--ok' : serverOk === false ? ' server-status--bad' : ''}`}
+      >
+        <span className="server-status-dot" aria-hidden />
         {serverOk === null && <p>Checking chess server…</p>}
-        {serverOk === true && <p>✓ Chess server connected — pick a mode to start.</p>}
+        {serverOk === true && <p>Server online — ready to play</p>}
         {serverOk === false && (
           <p>
-            ✗ Chess server not reachable.
+            Server offline.
             {!apiBase
-              ? ' Production needs the Go API deployed and VITE_API_BASE set on Vercel.'
-              : ' The API may be starting up (free tier) — wait 30s and refresh.'}
+              ? ' Deploy the Go API and set VITE_API_BASE on Vercel.'
+              : ' Free tier may need ~30s to wake — refresh shortly.'}
           </p>
         )}
       </div>
 
-      <div className="lobby-grid">
-        {modeCard('bot', 'Play vs Bot', 'Practice against the built-in engine.', 'white')}
-        {modeCard('bot', 'Bot as White', 'You play black; bot moves first.', 'black')}
-        {modeCard('online', 'Create Online Room', 'Share a link — friend joins as black on another device.')}
-        {modeCard('local', 'Local / Hot Seat', 'Two players on this device, both colors.')}
-      </div>
+      <section className="lobby-section lobby-panel lobby-anim lobby-anim--delay-4">
+        <h3 className="lobby-section-title">Bot strength</h3>
+        <div className="bot-level-picker">
+          {BOT_LEVELS.map((level) => (
+            <button
+              key={level.id}
+              type="button"
+              className={botLevel === level.id ? 'active' : ''}
+              onClick={() => setBotLevel(level.id)}
+            >
+              <strong>{level.label}</strong>
+              <span>~{level.elo} ELO</span>
+            </button>
+          ))}
+        </div>
+      </section>
 
-      <div className="lobby-join">
-        <h3>Join room</h3>
+      <section className="lobby-section lobby-anim lobby-anim--delay-5">
+        <h3 className="lobby-section-title">Play now</h3>
+        <div className="lobby-grid">
+          {modeCard('bot', 'bot', 'Play vs Bot', 'Practice against the built-in engine.', 'white', 'lobby-anim--delay-5')}
+          {modeCard('bot-black', 'bot', 'Bot as White', 'You play Black; the bot moves first.', 'black', 'lobby-anim--delay-6')}
+          {modeCard('online', 'online', 'Online Room', 'Create a room and share the invite link.', undefined, 'lobby-anim--delay-7')}
+          {modeCard('local', 'local', 'Hot Seat', 'Two players, one device — both colors.', undefined, 'lobby-anim--delay-8')}
+        </div>
+      </section>
+
+      <section className="lobby-join lobby-panel lobby-anim lobby-anim--delay-8">
+        <h3>Join a room</h3>
         <div className="lobby-join-row">
           <input
             type="text"
-            placeholder="Room code (game id)"
+            placeholder="Paste room code…"
             value={joinId}
             onChange={(e) => setJoinId(e.target.value.trim())}
             disabled={!canPlay}
           />
           <button
             type="button"
+            className="lobby-join-btn"
             disabled={busy || !joinId || !canPlay}
             onClick={() => run(() => onJoin(joinId))}
           >
             Join
           </button>
         </div>
-        <p className="lobby-hint">Open a shared link from a friend, or paste the room code here.</p>
-      </div>
+        <p className="lobby-hint">
+          Same computer? Open a <strong>new tab</strong> to join as Black while the creator stays
+          White.
+        </p>
+      </section>
 
-      {error && <p className="error lobby-error">{error}</p>}
+      {error && <p className="error lobby-error lobby-panel lobby-anim">{error}</p>}
 
-      <div className="lobby-features">
-        <h3>Included features</h3>
-        <ul>
-          <li>Legal moves, check, checkmate, stalemate</li>
-          <li>Castling, en passant, promotion (queen)</li>
-          <li>Resign, draw offers, threefold &amp; fifty-move claims</li>
-          <li>Move history, live sync, 2D / 3D views</li>
-          <li>Captured pieces on Valhalla (3D)</li>
+      <section className="lobby-features lobby-panel lobby-anim lobby-anim--delay-9">
+        <h3>What&apos;s included</h3>
+        <ul className="lobby-feature-chips">
+          {FEATURES.map((feature, i) => (
+            <li key={feature} className={`lobby-chip-anim lobby-anim--delay-${Math.min(9 + i, 12)}`}>
+              {feature}
+            </li>
+          ))}
         </ul>
-      </div>
+      </section>
     </div>
   )
 }

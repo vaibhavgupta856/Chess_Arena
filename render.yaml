@@ -9,3 +9,11 @@ services:
     envVars:
       - key: GO_VERSION
         value: 1.22.0
+      - key: DATABASE_PATH
+        value: /var/data/chessarena.db
+      - key: JWT_SECRET
+        generateValue: true
+    disk:
+      name: chessarena-data
+      mountPath: /var/data
+      sizeGB: 1

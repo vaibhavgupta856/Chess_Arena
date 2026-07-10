@@ -1,3 +1,4 @@
+import { CoachPanel } from './CoachPanel'
 import type { GameState } from '../types'
 import { canPlayerMove } from '../hooks/useGame'
 
@@ -13,10 +14,16 @@ type Props = {
   onRespondDraw: (accept: boolean, color?: 'white' | 'black') => void
   onClaimDraw: (type: 'threefold_repetition' | 'fifty_move_rule') => void
   onLeave: () => void
+  open?: boolean
+  onClose?: () => void
 }
 
 function formatOutcome(game: GameState) {
   if (!game.over) {
+    if (game.botThinking) return 'Bot is thinking…'
+    if (game.waitingFor === 'black' && game.yourColor === 'white') {
+      return 'You are White — share the invite link for Black to join'
+    }
     if (game.waitingFor) return `Waiting for ${game.waitingFor}…`
     if (game.inCheck) return `${game.turn} to move — check!`
     return `${game.turn} to move`
@@ -31,6 +38,11 @@ function opponentColor(color: string) {
   return color === 'white' ? 'black' : 'white'
 }
 
+function formatDelta(n?: number) {
+  if (!n) return '±0'
+  return n > 0 ? `+${n}` : `${n}`
+}
+
 export function GameSidebar({
   game,
   inviteLink,
@@ -43,6 +55,8 @@ export function GameSidebar({
   onRespondDraw,
   onClaimDraw,
   onLeave,
+  open = true,
+  onClose,
 }: Props) {
   const yourColor = game.yourColor || (game.mode === 'local' ? 'both' : '—')
   const canAct = canPlayerMove(game, atLivePosition)
@@ -74,10 +88,23 @@ export function GameSidebar({
       : undefined
 
   return (
-    <aside className="game-sidebar">
+    <aside className={`game-sidebar${open ? ' is-open' : ''}`}>
+      <div className="sidebar-drawer-head">
+        <h3>Game panel</h3>
+        {onClose && (
+          <button type="button" className="sidebar-close-btn" onClick={onClose} aria-label="Close menu">
+            ✕
+          </button>
+        )}
+      </div>
       <div className="sidebar-section">
         <h3>Game</h3>
         <p className="sidebar-status">{formatOutcome(game)}</p>
+        {game.over && game.mode === 'online' && (game.whiteEloDelta || game.blackEloDelta) ? (
+          <p className="lobby-hint">
+            Rating: White {formatDelta(game.whiteEloDelta)} · Black {formatDelta(game.blackEloDelta)}
+          </p>
+        ) : null}
         <dl className="sidebar-meta">
           <div>
             <dt>Room</dt>
@@ -87,6 +114,12 @@ export function GameSidebar({
             <dt>Mode</dt>
             <dd>{game.mode ?? 'local'}</dd>
           </div>
+          {game.mode === 'bot' && game.botElo && (
+            <div>
+              <dt>Bot ELO</dt>
+              <dd>~{game.botElo}</dd>
+            </div>
+          )}
           <div>
             <dt>You</dt>
             <dd>{yourColor}</dd>
@@ -130,6 +163,8 @@ export function GameSidebar({
           </button>
         </div>
       )}
+
+      <CoachPanel game={game} />
 
       {!game.over && (
         <div className="sidebar-section sidebar-actions">

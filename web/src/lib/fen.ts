@@ -57,8 +57,16 @@ export function coordToSquare(x: number, z: number): string | null {
   return `${String.fromCharCode('a'.charCodeAt(0) + file)}${rank + 1}`
 }
 
-export function buildUCI(source: string, target: string, turn: string): string {
+export function buildUCI(
+  source: string,
+  target: string,
+  turn: string,
+  pieceType?: string,
+): string {
   let uci = `${source}${target}`
+  const isPawn = pieceType?.endsWith('P') === true
+  if (!isPawn) return uci
+
   const promoRank = turn === 'white' ? '8' : '1'
   const pawnRank = turn === 'white' ? '7' : '2'
   if (source[1] === pawnRank && target[1] === promoRank) {

@@ -30,9 +30,9 @@ function Platform({ color, layout }: { color: 'white' | 'black'; layout: BoardLa
         <meshStandardMaterial color="#5a3d28" roughness={0.88} metalness={0.05} />
       </mesh>
       <Text
-        position={[0, 0.42, labelZ]}
+        position={[0, 0.52, labelZ]}
         rotation={labelRotation}
-        fontSize={0.32}
+        fontSize={0.55}
         color="#e8d4a8"
         anchorX="center"
         anchorY="middle"

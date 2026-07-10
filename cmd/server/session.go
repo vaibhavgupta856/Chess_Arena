@@ -2,25 +2,37 @@ package main
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/conan/chessarena/internal/chess"
 )
 
 type gameSession struct {
+	mu          sync.Mutex
 	id          string
 	game        *chess.Game
 	mode        string // local, online, bot
 	whitePlayer string
 	blackPlayer string
 	botColor    chess.Color
+	botLevel    chess.BotLevel
+	botThinking bool
+	botGen      int
 	drawOfferBy chess.Color
+	ratingDone  bool
+	whiteDelta  int
+	blackDelta  int
 }
 
-func newSession(id string, mode string, playAs string, clientID string) *gameSession {
+func newSession(id string, mode string, playAs string, clientID string, botLevel chess.BotLevel) *gameSession {
 	s := &gameSession{
-		id:   id,
-		game: chess.NewGame(),
-		mode: mode,
+		id:       id,
+		game:     chess.NewGame(),
+		mode:     mode,
+		botLevel: botLevel,
+	}
+	if s.botLevel == "" {
+		s.botLevel = chess.BotCasual
 	}
 	switch mode {
 	case "bot":
@@ -76,6 +88,11 @@ func (s *gameSession) playerColor(clientID string) chess.Color {
 }
 
 func (s *gameSession) canMove(clientID string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.botThinking {
+		return false
+	}
 	if s.game.IsOver() {
 		return false
 	}
@@ -138,7 +155,7 @@ func (s *gameSession) maybeBotMove() error {
 	if s.game.Turn() != s.botColor {
 		return nil
 	}
-	move, ok := chess.ChooseBotMove(s.game)
+	move, ok := chess.ChooseBotMove(s.game, s.botLevel)
 	if !ok {
 		return nil
 	}

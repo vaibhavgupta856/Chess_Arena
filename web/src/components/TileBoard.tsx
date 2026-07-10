@@ -1,13 +1,15 @@
 import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import { allSquares, isLightSquare, setBoardSurfaceY } from '../lib/boardLayout'
-import { BOARD_EDGE, BOARD_THICKNESS, TILE_GREEN, TILE_SAND } from '../lib/modelUtils'
+import type { BoardTheme } from '../lib/themes'
+import { BOARD_THICKNESS } from '../lib/modelUtils'
 
 type TileBoardProps = {
+  theme: BoardTheme
   onSurfaceY?: (y: number) => void
 }
 
-export function TileBoard({ onSurfaceY }: TileBoardProps) {
+export function TileBoard({ theme, onSurfaceY }: TileBoardProps) {
   useEffect(() => {
     setBoardSurfaceY(0)
     onSurfaceY?.(0)
@@ -19,7 +21,7 @@ export function TileBoard({ onSurfaceY }: TileBoardProps) {
     const slab = new THREE.Mesh(
       new THREE.BoxGeometry(8, BOARD_THICKNESS, 8),
       new THREE.MeshStandardMaterial({
-        color: BOARD_EDGE,
+        color: theme.boardEdge,
         roughness: 0.88,
         metalness: 0.04,
       }),
@@ -34,7 +36,7 @@ export function TileBoard({ onSurfaceY }: TileBoardProps) {
       const geom = new THREE.PlaneGeometry(1, 1)
       const isLight = isLightSquare(sq.square)
       const mat = new THREE.MeshStandardMaterial({
-        color: isLight ? TILE_SAND : TILE_GREEN,
+        color: isLight ? theme.tileLight : theme.tileDark,
         roughness: 0.6,
         metalness: 0.05,
       })
@@ -46,7 +48,7 @@ export function TileBoard({ onSurfaceY }: TileBoardProps) {
     }
 
     return group
-  }, [])
+  }, [theme])
 
   return <primitive object={board} receiveShadow />
 }

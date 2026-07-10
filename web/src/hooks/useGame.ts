@@ -1,31 +1,48 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { diffBoardTransition, fenToPieces } from '../lib/fen'
-import { getClientId } from '../lib/clientId'
+import { getGameClientId, getHostClientId, getTabClientId, getActiveClientForGame, setActiveClientForGame, clearActiveClientForGame, markGameHostedInTab, isGameHostedInTab } from '../lib/clientId'
 import {
   playCaptureSound,
   playGameEndSound,
   playMoveSound,
 } from '../lib/chessSounds'
-import { checkServerHealth, getApiBase } from '../lib/api'
+import { checkServerHealth, getApiBase, apiHeaders } from '../lib/api'
 import type { CreateGameOptions, GameMode, GameState } from '../types'
 
 const API_BASE = getApiBase()
 
-function normalizeGameState(data: GameState): GameState {
+function normalizeGameState(data: GameState, clientId?: string): GameState {
   const mode = data.mode ?? 'local'
   const positionFens =
     data.positionFens && data.positionFens.length > 0 ? data.positionFens : [data.fen]
   const ply = data.ply ?? positionFens.length - 1
-  let yourColor = data.yourColor
-  if (!yourColor && mode === 'local') {
-    yourColor = 'both'
+
+  let waitingFor: GameState['waitingFor'] = ''
+  if (mode === 'online') {
+    if (!data.whitePlayer) waitingFor = 'white'
+    else if (!data.blackPlayer) waitingFor = 'black'
   }
+
+  let yourColor = data.yourColor
+  if (mode === 'local') {
+    yourColor = 'both'
+  } else if (mode === 'bot') {
+    if (data.whitePlayer === 'bot') yourColor = 'black'
+    else if (data.blackPlayer === 'bot') yourColor = 'white'
+    else if (clientId && clientId === data.whitePlayer) yourColor = 'white'
+    else if (clientId && clientId === data.blackPlayer) yourColor = 'black'
+  } else if (clientId) {
+    if (clientId === data.whitePlayer) yourColor = 'white'
+    else if (clientId === data.blackPlayer) yourColor = 'black'
+  }
+
   return {
     ...data,
     mode,
     positionFens,
     ply,
     yourColor,
+    waitingFor,
   }
 }
 
@@ -48,7 +65,7 @@ function gameUrl(gameId: string) {
 }
 
 export function useGame() {
-  const clientId = useRef(getClientId()).current
+  const hostId = useRef(getHostClientId()).current
   const [game, setGame] = useState<GameState | null>(null)
   const [screen, setScreen] = useState<'lobby' | 'game'>('lobby')
   const [error, setError] = useState<string | null>(null)
@@ -73,9 +90,10 @@ export function useGame() {
     (gameId: string) => {
       if (!API_BASE) return
       socketRef.current?.close()
-      const socket = new WebSocket(wsUrl(gameId, clientId))
+      const socket = new WebSocket(wsUrl(gameId, getGameClientId(gameId)))
       socket.onmessage = (event) => {
-        const updated = normalizeGameState(JSON.parse(event.data) as GameState)
+        const cid = getGameClientId(gameId)
+        const updated = normalizeGameState(JSON.parse(event.data) as GameState, cid)
         setViewPly(updated.ply ?? 0)
         setGame((current) => {
           playMoveFeedback(current?.fen ?? null, updated)
@@ -88,12 +106,14 @@ export function useGame() {
       }
       socketRef.current = socket
     },
-    [clientId, playMoveFeedback],
+    [playMoveFeedback],
   )
 
   const applyGame = useCallback(
-    (data: GameState, openSocket = true) => {
-      const normalized = normalizeGameState(data)
+    (data: GameState, gameClientId: string, openSocket = true, hostedInTab = false) => {
+      const normalized = normalizeGameState(data, gameClientId)
+      setActiveClientForGame(normalized.id, gameClientId)
+      if (hostedInTab) markGameHostedInTab(normalized.id)
       prevFenRef.current = normalized.fen
       setGame(normalized)
       setViewPly(normalized.ply ?? 0)
@@ -104,11 +124,12 @@ export function useGame() {
     [connectSocket],
   )
 
-  const refreshGame = useCallback(async (id: string) => {
-    const res = await fetch(`${API_BASE}/games/${id}?clientId=${encodeURIComponent(clientId)}`)
+  const refreshGame = useCallback(async (id: string, clientId?: string) => {
+    const cid = clientId ?? getGameClientId(id)
+    const res = await fetch(`${API_BASE}/games/${id}?clientId=${encodeURIComponent(cid)}`)
     if (!res.ok) throw new Error(await res.text())
-    return normalizeGameState((await res.json()) as GameState)
-  }, [clientId])
+    return normalizeGameState((await res.json()) as GameState, cid)
+  }, [])
 
   const createGame = useCallback(
     async (options: CreateGameOptions) => {
@@ -128,16 +149,17 @@ export function useGame() {
             : options.playAs ?? 'white'
         const res = await fetch(`${API_BASE}/games`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: apiHeaders(),
           body: JSON.stringify({
             mode: options.mode,
             playAs,
-            clientId,
+            clientId: hostId,
+            botLevel: options.botLevel ?? 'casual',
           }),
         })
         if (!res.ok) throw new Error(await res.text())
         const data = (await res.json()) as GameState
-        applyGame(data)
+        applyGame(data, hostId, true, true)
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed to create game'
         if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
@@ -151,39 +173,79 @@ export function useGame() {
         }
       }
     },
-    [applyGame, clientId],
+    [applyGame, hostId],
   )
 
   const joinGame = useCallback(
     async (gameId: string) => {
       try {
         setError(null)
+        const tabId = getTabClientId()
         const res = await fetch(`${API_BASE}/games/${gameId}/join`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ clientId }),
+          headers: apiHeaders(),
+          body: JSON.stringify({ clientId: tabId }),
         })
         if (!res.ok) throw new Error(await res.text())
         const data = (await res.json()) as GameState
-        applyGame(data)
+        applyGame(data, tabId)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to join game')
       }
     },
-    [applyGame, clientId],
+    [applyGame],
   )
 
   const loadGame = useCallback(
     async (gameId: string) => {
       setError(null)
-      const data = await refreshGame(gameId)
-      if (data.mode === 'online' && !data.yourColor) {
-        await joinGame(gameId)
+
+      const active = getActiveClientForGame(gameId)
+      if (active) {
+        applyGame(await refreshGame(gameId, active), active)
         return
       }
-      applyGame(data)
+
+      if (isGameHostedInTab(gameId)) {
+        applyGame(await refreshGame(gameId, hostId), hostId)
+        return
+      }
+
+      const peek = await refreshGame(gameId, hostId)
+      if (peek.mode === 'online' && !peek.blackPlayer) {
+        const tabId = getTabClientId()
+        const res = await fetch(`${API_BASE}/games/${gameId}/join`, {
+          method: 'POST',
+          headers: apiHeaders(),
+          body: JSON.stringify({ clientId: tabId }),
+        })
+        if (!res.ok) throw new Error(await res.text())
+        const data = (await res.json()) as GameState
+        applyGame(data, tabId)
+        return
+      }
+
+      if (peek.whitePlayer === hostId || peek.blackPlayer === hostId) {
+        applyGame(peek, hostId)
+        return
+      }
+
+      const tabId = getTabClientId()
+      if (peek.whitePlayer === tabId || peek.blackPlayer === tabId) {
+        applyGame(await refreshGame(gameId, tabId), tabId)
+        return
+      }
+
+      const res = await fetch(`${API_BASE}/games/${gameId}/join`, {
+        method: 'POST',
+        headers: apiHeaders(),
+        body: JSON.stringify({ clientId: tabId }),
+      })
+      if (!res.ok) throw new Error(await res.text())
+      const data = (await res.json()) as GameState
+      applyGame(data, tabId)
     },
-    [applyGame, joinGame, refreshGame],
+    [applyGame, hostId, refreshGame],
   )
 
   const submitMove = useCallback(
@@ -194,36 +256,39 @@ export function useGame() {
         setError('Go to the latest move before playing.')
         return
       }
+      const cid = getGameClientId(game.id)
       const res = await fetch(`${API_BASE}/games/${game.id}/moves`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uci, clientId }),
+        headers: apiHeaders(),
+        body: JSON.stringify({ uci, clientId: cid }),
       })
       if (!res.ok) {
         const msg = await res.text()
-        const latest = await refreshGame(game.id)
+        const latest = await refreshGame(game.id, cid)
         setGame(latest)
         setViewPly(latest.ply ?? 0)
         setError(msg)
         return
       }
-      const data = normalizeGameState((await res.json()) as GameState)
+      const data = normalizeGameState((await res.json()) as GameState, cid)
       playMoveFeedback(game.fen, data)
       prevFenRef.current = data.fen
       setViewPly(data.ply ?? 0)
       setGame(data)
       setError(null)
     },
-    [clientId, game, playMoveFeedback, refreshGame, viewPly],
+    [game, playMoveFeedback, refreshGame, viewPly],
   )
+
 
   const resign = useCallback(
     async (color?: 'white' | 'black') => {
       if (!game) return
+      const cid = getGameClientId(game.id)
       const res = await fetch(`${API_BASE}/games/${game.id}/resign`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientId, color }),
+        headers: apiHeaders(),
+        body: JSON.stringify({ clientId: cid, color }),
       })
       if (!res.ok) {
         setError(await res.text())
@@ -233,15 +298,16 @@ export function useGame() {
       setGame(data)
       setError(null)
     },
-    [clientId, game],
+    [game],
   )
 
   const offerDraw = useCallback(async (color?: 'white' | 'black') => {
     if (!game) return
+    const cid = getGameClientId(game.id)
     const res = await fetch(`${API_BASE}/games/${game.id}/draw`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'draw_offer', clientId, color }),
+      headers: apiHeaders(),
+      body: JSON.stringify({ type: 'draw_offer', clientId: cid, color }),
     })
     if (!res.ok) {
       setError(await res.text())
@@ -250,15 +316,16 @@ export function useGame() {
     const data = (await res.json()) as GameState
     setGame(data)
     setError(null)
-  }, [clientId, game])
+  }, [game])
 
   const respondDraw = useCallback(
     async (accept: boolean, color?: 'white' | 'black') => {
       if (!game) return
+      const cid = getGameClientId(game.id)
       const res = await fetch(`${API_BASE}/games/${game.id}/draw/respond`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientId, accept, color }),
+        headers: apiHeaders(),
+        body: JSON.stringify({ clientId: cid, accept, color }),
       })
       if (!res.ok) {
         setError(await res.text())
@@ -268,16 +335,17 @@ export function useGame() {
       setGame(data)
       setError(null)
     },
-    [clientId, game],
+    [game],
   )
 
   const claimDraw = useCallback(
     async (type: 'threefold_repetition' | 'fifty_move_rule') => {
       if (!game) return
+      const cid = getGameClientId(game.id)
       const res = await fetch(`${API_BASE}/games/${game.id}/draw`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, clientId }),
+        headers: apiHeaders(),
+        body: JSON.stringify({ type, clientId: cid }),
       })
       if (!res.ok) {
         setError(await res.text())
@@ -287,7 +355,7 @@ export function useGame() {
       setGame(data)
       setError(null)
     },
-    [clientId, game],
+    [game],
   )
 
   const undoView = useCallback(() => {
@@ -309,6 +377,7 @@ export function useGame() {
   const atLivePosition = !game || viewPly >= livePly
 
   const leaveToLobby = useCallback(() => {
+    if (game) clearActiveClientForGame(game.id)
     socketRef.current?.close()
     socketRef.current = null
     setGame(null)
@@ -318,7 +387,7 @@ export function useGame() {
     const url = new URL(window.location.href)
     url.searchParams.delete('game')
     window.history.replaceState({}, '', url.toString())
-  }, [])
+  }, [game])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -337,10 +406,11 @@ export function useGame() {
     screen,
     error,
     inviteLink,
-    clientId,
+    clientId: hostId,
     createGame,
     joinGame,
     loadGame,
+    enterGame: applyGame,
     submitMove,
     resign,
     offerDraw,
@@ -358,13 +428,17 @@ export function useGame() {
 }
 
 export function canPlayerMove(game: GameState, atLive = true): boolean {
+  if (game.botThinking) return false
   if (!atLive || game.over) return false
   const mode = game.mode ?? 'local'
   if (mode === 'local' || game.yourColor === 'both') return true
   if (mode === 'online' && game.waitingFor) return false
+  if (mode === 'bot') {
+    if (!game.yourColor) return false
+    return game.yourColor === game.turn
+  }
   if (!game.yourColor) {
-    // Legacy API responses without role metadata — allow play; server validates moves.
-    return mode !== 'online'
+    return false
   }
   return game.yourColor === game.turn
 }
