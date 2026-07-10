@@ -1,10 +1,10 @@
 import { useFrame } from '@react-three/fiber'
 import type { ThreeEvent } from '@react-three/fiber'
-import { Suspense, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import type { BoardPiece } from '../types'
 import type { CameraMode } from './BoardCameraControls'
-import { GlbPiece } from './GlbPiece'
+import { ProceduralPiece } from './ProceduralPiece'
 
 export type PieceVisual = Omit<BoardPiece, 'square'> & {
   id: string
@@ -127,9 +127,7 @@ export function AnimatedPiece({ piece, cameraMode, onDone, onClick, onHover }: A
         onHover(null)
       }}
     >
-      <Suspense fallback={null}>
-        <GlbPiece pieceType={piece.pieceType} color={piece.color} />
-      </Suspense>
+      <ProceduralPiece pieceType={piece.pieceType} color={piece.color} />
     </group>
   )
 }

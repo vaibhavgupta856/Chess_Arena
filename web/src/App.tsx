@@ -56,6 +56,10 @@ function App() {
 
     atLivePosition,
 
+    apiBase,
+
+    checkServerHealth,
+
   } = useGame()
 
   const [view, setView] = useState<ViewMode>('3d')
@@ -82,7 +86,13 @@ function App() {
 
         <main className="lobby-container">
 
-          <GameLobby onCreate={createGame} onJoin={joinGame} error={error} />
+          <GameLobby
+            onCreate={createGame}
+            onJoin={joinGame}
+            error={error}
+            apiBase={apiBase}
+            checkServerHealth={checkServerHealth}
+          />
 
         </main>
 
@@ -186,7 +196,6 @@ function App() {
                   atLivePosition={atLivePosition}
                   canMove={canMove}
                   onMove={submitMove}
-                  onSwitchTo2D={() => setView('2d')}
                 />
               </div>
 

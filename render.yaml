@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: chessarena-api
+    runtime: go
+    plan: free
+    buildCommand: go build -o server ./cmd/server
+    startCommand: ./server
+    healthCheckPath: /health
+    envVars:
+      - key: GO_VERSION
+        value: 1.22.0

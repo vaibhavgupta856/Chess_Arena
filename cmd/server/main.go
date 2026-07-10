@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -522,6 +523,9 @@ func main() {
 	s := newServer()
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	})
 	mux.HandleFunc("POST /games", s.newGameHandler)
 	mux.HandleFunc("GET /games/{id}", s.gameStateHandler)
 	mux.HandleFunc("POST /games/{id}/join", s.joinHandler)
@@ -532,7 +536,11 @@ func main() {
 	mux.HandleFunc("POST /games/{id}/draw/respond", s.drawResponseHandler)
 	mux.HandleFunc("GET /ws/games/{id}", s.wsHandler)
 
-	addr := ":8080"
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	addr := ":" + port
 	log.Printf("chess server listening on %s", addr)
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")

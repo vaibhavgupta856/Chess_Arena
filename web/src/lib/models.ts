@@ -1,17 +1,3 @@
-import bishopModel from '../../../assets/bishop__alfil.glb?url'
-import kingModel from '../../../assets/chess_king_2.glb?url'
-import knightModel from '../../../assets/chess_knight.glb?url'
-import pawnModel from '../../../assets/chess_pawn.glb?url'
-import rookModel from '../../../assets/chess_rook.glb?url'
-import queenModel from '../../../assets/queen_2.glb?url'
-
-export const PIECE_MODELS: Record<string, string> = {
-  P: pawnModel,
-  R: rookModel,
-  N: knightModel,
-  B: bishopModel,
-  Q: queenModel,
-  K: kingModel,
-}
-
-export const ALL_MODEL_URLS = [...Object.values(PIECE_MODELS)]
+// 3D pieces use lightweight procedural geometry (no GLB download).
+// Set VITE_USE_GLB_PIECES=true to opt into legacy ~180MB model files.
+export const USE_GLB_PIECES = import.meta.env.VITE_USE_GLB_PIECES === 'true'

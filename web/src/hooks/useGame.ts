@@ -6,14 +6,10 @@ import {
   playGameEndSound,
   playMoveSound,
 } from '../lib/chessSounds'
+import { checkServerHealth, getApiBase } from '../lib/api'
 import type { CreateGameOptions, GameMode, GameState } from '../types'
 
-const API_BASE =
-  import.meta.env.VITE_API_BASE && import.meta.env.VITE_API_BASE.length > 0
-    ? import.meta.env.VITE_API_BASE
-    : import.meta.env.DEV
-      ? '/api'
-      : 'http://localhost:8080'
+const API_BASE = getApiBase()
 
 function normalizeGameState(data: GameState): GameState {
   const mode = data.mode ?? 'local'
@@ -34,6 +30,7 @@ function normalizeGameState(data: GameState): GameState {
 }
 
 function wsUrl(gameId: string, clientId: string) {
+  if (!API_BASE) return ''
   if (import.meta.env.DEV && !import.meta.env.VITE_API_BASE) {
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     return `${proto}//${window.location.host}/api/ws/games/${gameId}?clientId=${encodeURIComponent(clientId)}`
@@ -74,6 +71,7 @@ export function useGame() {
 
   const connectSocket = useCallback(
     (gameId: string) => {
+      if (!API_BASE) return
       socketRef.current?.close()
       const socket = new WebSocket(wsUrl(gameId, clientId))
       socket.onmessage = (event) => {
@@ -116,6 +114,12 @@ export function useGame() {
     async (options: CreateGameOptions) => {
       try {
         setError(null)
+        if (!API_BASE) {
+          setError(
+            'Chess server is not connected. The live site needs the Go API deployed (see render.yaml in the repo).',
+          )
+          return
+        }
         const playAs =
           options.playAs === 'random'
             ? Math.random() < 0.5
@@ -138,7 +142,9 @@ export function useGame() {
         const msg = err instanceof Error ? err.message : 'Failed to create game'
         if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
           setError(
-            'Cannot reach the chess server. Start it with: go run ./cmd/server (port 8080), then refresh.',
+            API_BASE
+              ? 'Cannot reach the chess server. If you are the site owner, check that the API is running and VITE_API_BASE is set on Vercel.'
+              : 'Chess server is not configured for this deployment.',
           )
         } else {
           setError(msg)
@@ -346,6 +352,8 @@ export function useGame() {
     redoView,
     displayFen,
     atLivePosition,
+    apiBase: API_BASE,
+    checkServerHealth: () => checkServerHealth(API_BASE),
   }
 }
 

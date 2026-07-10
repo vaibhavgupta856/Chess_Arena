@@ -1,7 +1,6 @@
 import { Canvas, useFrame } from '@react-three/fiber'
-import { Text, useGLTF } from '@react-three/drei'
+import { Text } from '@react-three/drei'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { usePreload3DAssets } from '../hooks/usePreload3DAssets'
 import type { ThreeEvent } from '@react-three/fiber'
 import type { MeshStandardMaterial } from 'three'
 import type { GameState, BoardPiece } from '../types'
@@ -14,7 +13,6 @@ import {
   type BoardLayout,
 } from '../lib/boardLayout'
 import { buildUCI, diffBoardTransition, fenToPieces } from '../lib/fen'
-import { ALL_MODEL_URLS } from '../lib/models'
 import { valhallaSlotPosition } from '../lib/valhalla'
 import { AnimatedPiece, type PieceVisual } from './AnimatedPiece'
 import { BoardCameraControls, CAMERA_PRESETS, type CameraAngleId, type CameraMode } from './BoardCameraControls'
@@ -27,7 +25,6 @@ type Props = {
   atLivePosition: boolean
   canMove: boolean
   onMove: (uci: string) => void
-  onSwitchTo2D?: () => void
 }
 
 const SELECT_COLOR = '#5ce1ff'
@@ -537,14 +534,9 @@ function Scene({
   )
 }
 
-export function ChessBoard3D({ game, displayFen, atLivePosition, canMove, onMove, onSwitchTo2D }: Props) {
-  const { isLoading, progress } = usePreload3DAssets()
+export function ChessBoard3D({ game, displayFen, atLivePosition, canMove, onMove }: Props) {
   const [cameraMode, setCameraMode] = useState<CameraMode>('fixed')
   const [cameraAngle, setCameraAngle] = useState<CameraAngleId>('corner-ne')
-
-  useEffect(() => {
-    ALL_MODEL_URLS.forEach((url) => useGLTF.preload(url))
-  }, [])
 
   return (
     <div className="board-3d">
@@ -585,26 +577,6 @@ export function ChessBoard3D({ game, displayFen, atLivePosition, canMove, onMove
         </div>
       </div>
 
-      {isLoading && (
-        <div className="loading-screen" role="status" aria-live="polite">
-          <div className="loading-overlay">
-            <h2>3D assets are loading, please wait…</h2>
-            <p>Large 3D piece models are still downloading. This can take a little while on first load.</p>
-            <div className="loading-bar" aria-hidden="true">
-              <div className="loading-bar-fill" style={{ width: `${progress}%` }} />
-            </div>
-            <p className="loading-progress">{progress}% loaded</p>
-            <p className="loading-hint">
-              Want to play now? Use the 2D board while assets load, then switch back to 3D anytime.
-            </p>
-            {onSwitchTo2D && (
-              <button type="button" className="loading-switch-btn" onClick={onSwitchTo2D}>
-                Use 2D board while loading
-              </button>
-            )}
-          </div>
-        </div>
-      )}
       <Canvas className="board-3d-canvas" shadows camera={{ position: [7.5, 9.5, -7.5], fov: 48 }}>
         <color attach="background" args={['#9ec8e8']} />
         <fog attach="fog" args={['#9ec8e8', 16, 32]} />
