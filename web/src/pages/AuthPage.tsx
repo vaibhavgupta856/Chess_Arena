@@ -33,6 +33,8 @@ export function AuthPage({ onDone }: Props) {
       <h2>{mode === 'login' ? 'Sign in' : 'Create account'}</h2>
       <p className="lobby-hint">
         Pick any username and password. Usernames must be unique — duplicates are rejected.
+        Each browser tab keeps its own sign-in — open a new tab (don&apos;t use Duplicate) for a
+        second account.
       </p>
       <div className="auth-form">
         <input placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />

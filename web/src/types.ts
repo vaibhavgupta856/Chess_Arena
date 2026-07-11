@@ -81,6 +81,8 @@ export type FriendRequest = {
 export type FriendChallenge = {
   id: string
   challengerId: string
+  challengerUsername?: string
+  challengerDisplayName?: string
   opponentId: string
   gameId: string
   status: string

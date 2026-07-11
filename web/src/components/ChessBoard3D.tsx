@@ -1,7 +1,7 @@
 import { Canvas, useFrame } from '@react-three/fiber'
-import { Text } from '@react-three/drei'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { MeshStandardMaterial } from 'three'
+import type { MeshBasicMaterial } from 'three'
+import * as THREE from 'three'
 import type { GameState, BoardPiece } from '../types'
 import {
   allSquares,
@@ -83,6 +83,7 @@ function SquareHitbox({
   x,
   z,
   layout,
+  geometry,
   onClick,
   onHover,
 }: {
@@ -90,15 +91,16 @@ function SquareHitbox({
   x: number
   z: number
   layout: BoardLayout
+  geometry: THREE.BoxGeometry
   onClick: (square: string) => void
   onHover: (square: string | null) => void
 }) {
   const hitY = layout.surfaceY + 0.04
-  const [hitW, hitD] = getSquareHitSize(square, layout)
 
   return (
     <mesh
       position={[x, hitY, z]}
+      geometry={geometry}
       onClick={(e) => {
         e.stopPropagation()
         onClick(square)
@@ -112,7 +114,6 @@ function SquareHitbox({
         onHover(null)
       }}
     >
-      <boxGeometry args={[hitW, 0.04, hitD]} />
       <meshBasicMaterial transparent opacity={0} depthWrite={false} />
     </mesh>
   )
@@ -129,8 +130,7 @@ function SquareHighlights({
   hovered: string | null
   theme: BoardTheme
 }) {
-  const selectMat = useRef<MeshStandardMaterial>(null)
-  const hoverMat = useRef<MeshStandardMaterial>(null)
+  const selectMat = useRef<MeshBasicMaterial>(null)
 
   const selectedPos = selected ? layout.squares.get(selected) : null
   const hoveredPos =
@@ -143,16 +143,9 @@ function SquareHighlights({
   const highlightThickness = 0.006
 
   useFrame(({ clock }) => {
-    const pulse = 0.5 + 0.5 * Math.sin(clock.elapsedTime * 8)
-    if (selectMat.current) {
-      selectMat.current.opacity = 0.35 + pulse * 0.45
-      selectMat.current.emissiveIntensity = 0.4 + pulse * 0.35
-    }
-    if (hoverMat.current) {
-      const hoverPulse = 0.5 + 0.5 * Math.sin(clock.elapsedTime * 5.5 + 0.8)
-      hoverMat.current.opacity = 0.28 + hoverPulse * 0.4
-      hoverMat.current.emissiveIntensity = 0.3 + hoverPulse * 0.25
-    }
+    if (!selectMat.current) return
+    const pulse = 0.5 + 0.5 * Math.sin(clock.elapsedTime * 4)
+    selectMat.current.opacity = 0.4 + pulse * 0.3
   })
 
   return (
@@ -166,15 +159,11 @@ function SquareHighlights({
               selectedSize[1] * SQUARE_HIGHLIGHT_SCALE,
             ]}
           />
-          <meshStandardMaterial
+          <meshBasicMaterial
             ref={selectMat}
             color={theme.highlightSelect}
             transparent
-            opacity={0.6}
-            emissive={theme.highlightSelect}
-            emissiveIntensity={0.55}
-            roughness={0.35}
-            metalness={0.2}
+            opacity={0.55}
             depthTest={false}
             depthWrite={false}
           />
@@ -189,15 +178,10 @@ function SquareHighlights({
               hoveredSize[1] * SQUARE_HIGHLIGHT_SCALE,
             ]}
           />
-          <meshStandardMaterial
-            ref={hoverMat}
+          <meshBasicMaterial
             color={theme.highlightHover}
             transparent
-            opacity={0.45}
-            emissive={theme.highlightHover}
-            emissiveIntensity={0.4}
-            roughness={0.45}
-            metalness={0.15}
+            opacity={0.35}
             depthTest={false}
             depthWrite={false}
           />
@@ -229,6 +213,10 @@ function Scene({
   const pieces = useMemo(() => fenToPieces(displayFen), [displayFen])
   const turn = useMemo(() => (displayFen.split(' ')[1] === 'w' ? 'white' : 'black'), [displayFen])
   const layout = useMemo(() => getBoardLayout(boardSurfaceY), [boardSurfaceY])
+  const hitGeometry = useMemo(() => {
+    const [w, d] = getSquareHitSize('e4', layout)
+    return new THREE.BoxGeometry(w, 0.04, d)
+  }, [layout])
 
   const initPieces = useCallback((fen: string) => {
     const next = fenToPieces(fen)
@@ -466,17 +454,26 @@ function Scene({
 
   return (
     <>
-      <ambientLight intensity={1.05} />
-      <hemisphereLight args={['#d4ecff', '#2a5240', 0.55]} />
-      <directionalLight position={[6, 14, 5]} intensity={1.25} castShadow />
-      <directionalLight position={[-4, 8, 6]} intensity={0.65} />
-      <directionalLight position={[0, 5, -8]} intensity={0.35} />
-      <pointLight position={[0, 10, 0]} intensity={0.5} color="#fff8ee" />
+      <ambientLight intensity={1.15} />
+      <hemisphereLight args={['#d4ecff', '#2a5240', 0.45]} />
+      <directionalLight
+        position={[6, 14, 5]}
+        intensity={1.15}
+        castShadow
+        shadow-mapSize={[1024, 1024]}
+        shadow-bias={-0.0002}
+        shadow-camera-near={2}
+        shadow-camera-far={28}
+        shadow-camera-left={-9}
+        shadow-camera-right={9}
+        shadow-camera-top={9}
+        shadow-camera-bottom={-9}
+      />
+      <directionalLight position={[-5, 8, -4]} intensity={0.35} />
 
-      {/* Dark ground plane under the board so pieces (white + brown) stay easy to read */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.52, 0]} receiveShadow>
-        <planeGeometry args={[36, 36]} />
-        <meshStandardMaterial color={theme.ground} roughness={0.92} metalness={0.02} />
+        <planeGeometry args={[28, 28]} />
+        <meshStandardMaterial color={theme.ground} roughness={0.95} metalness={0.02} />
       </mesh>
 
       <Suspense fallback={null}>
@@ -491,6 +488,7 @@ function Scene({
           x={sq.x}
           z={sq.z}
           layout={layout}
+          geometry={hitGeometry}
           onClick={handleSquareClick}
           onHover={setHovered}
         />
@@ -507,15 +505,6 @@ function Scene({
       ))}
 
       <SquareHighlights layout={layout} selected={selected} hovered={hovered} theme={theme} />
-
-      <Text
-        position={[0, layout.surfaceY - layout.cellSize, -layout.cellSize * 5]}
-        fontSize={layout.cellSize * 0.3}
-        color="#eef6ff"
-        anchorX="center"
-      >
-        click piece, then destination
-      </Text>
 
       <BoardCameraControls cameraMode={cameraMode} cameraAngle={cameraAngle} />
     </>
@@ -569,6 +558,8 @@ export function ChessBoard3D({ game, displayFen, atLivePosition, canMove, onMove
       <Canvas
         className="board-3d-canvas"
         shadows
+        dpr={[1, 1.5]}
+        gl={{ antialias: true, powerPreference: 'high-performance', stencil: false }}
         camera={{ position: [7.5, 9.5, -7.5], fov: 48 }}
         onPointerDown={(e) => {
           if (e.button === 2) e.preventDefault()

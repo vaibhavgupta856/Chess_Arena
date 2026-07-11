@@ -1,5 +1,20 @@
-import { useCallback, useEffect, useState } from 'react'
-import { apiFetch, getAuthToken, setAuthToken } from '../lib/api'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react'
+import {
+  AUTH_RESET_EVENT,
+  apiFetch,
+  getAuthToken,
+  getTabAuthLabel,
+  initTabAuthIsolation,
+  setAuthToken,
+} from '../lib/api'
 import type { UserProfile } from '../types'
 
 type AuthResponse = {
@@ -7,9 +22,23 @@ type AuthResponse = {
   user: UserProfile
 }
 
-export function useAuth() {
+type AuthContextValue = {
+  user: UserProfile | null
+  loading: boolean
+  tabLabel: string
+  register: (username: string, password: string, displayName?: string) => Promise<UserProfile>
+  login: (username: string, password: string) => Promise<UserProfile>
+  logout: () => void
+  updateProfile: (displayName: string, avatarUrl?: string) => Promise<UserProfile>
+  refresh: () => Promise<void>
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null)
+
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [tabLabel, setTabLabel] = useState('')
 
   const refresh = useCallback(async () => {
     const token = getAuthToken()
@@ -34,7 +63,17 @@ export function useAuth() {
   }, [])
 
   useEffect(() => {
+    initTabAuthIsolation()
+    setTabLabel(getTabAuthLabel())
     void refresh()
+
+    const onReset = () => {
+      setUser(null)
+      setTabLabel(getTabAuthLabel())
+      setLoading(false)
+    }
+    window.addEventListener(AUTH_RESET_EVENT, onReset)
+    return () => window.removeEventListener(AUTH_RESET_EVENT, onReset)
   }, [refresh])
 
   const register = useCallback(async (username: string, password: string, displayName?: string) => {
@@ -46,6 +85,7 @@ export function useAuth() {
     const data = (await res.json()) as AuthResponse
     setAuthToken(data.token)
     setUser(data.user)
+    setTabLabel(getTabAuthLabel())
     return data.user
   }, [])
 
@@ -58,6 +98,7 @@ export function useAuth() {
     const data = (await res.json()) as AuthResponse
     setAuthToken(data.token)
     setUser(data.user)
+    setTabLabel(getTabAuthLabel())
     return data.user
   }, [])
 
@@ -77,5 +118,16 @@ export function useAuth() {
     return updated
   }, [])
 
-  return { user, loading, register, login, logout, updateProfile, refresh }
+  const value = useMemo(
+    () => ({ user, loading, tabLabel, register, login, logout, updateProfile, refresh }),
+    [user, loading, tabLabel, register, login, logout, updateProfile, refresh],
+  )
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthContext)
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider')
+  return ctx
 }

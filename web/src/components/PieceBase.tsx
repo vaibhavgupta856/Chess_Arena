@@ -10,31 +10,17 @@ type PieceBaseProps = {
 export function PieceBase({ kind, color, radius, theme }: PieceBaseProps) {
   const fill = color === 'white' ? theme.pieceBaseLight : theme.pieceBaseDark
   const edge = color === 'white' ? theme.pieceRingLight : theme.pieceRingDark
-
-  if (kind === 'B') {
-    return (
-      <group position={[0, 0.003, 0]}>
-        <mesh rotation={[-Math.PI / 2, 0, 0]} scale={[1.35, 1.35, 1]}>
-          <circleGeometry args={[radius * 0.62, 32]} />
-          <meshStandardMaterial color={fill} roughness={0.7} metalness={0.04} />
-        </mesh>
-        <mesh position={[0, 0.001, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[1.4, 1.4, 1]}>
-          <ringGeometry args={[radius * 0.58, radius * 1.02, 48]} />
-          <meshStandardMaterial color={edge} roughness={0.75} metalness={0.05} />
-        </mesh>
-      </group>
-    )
-  }
+  const scale = kind === 'B' ? 1.35 : 1
 
   return (
-    <group position={[0, 0.003, 0]}>
+    <group position={[0, 0.003, 0]} scale={[scale, scale, 1]}>
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[radius * 0.58, 32]} />
-        <meshStandardMaterial color={fill} roughness={0.7} metalness={0.04} />
+        <circleGeometry args={[radius * 0.58, 12]} />
+        <meshBasicMaterial color={fill} />
       </mesh>
       <mesh position={[0, 0.001, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[radius * 0.56, radius, 48]} />
-        <meshStandardMaterial color={edge} roughness={0.75} metalness={0.05} />
+        <ringGeometry args={[radius * 0.56, radius, 16]} />
+        <meshBasicMaterial color={edge} />
       </mesh>
     </group>
   )

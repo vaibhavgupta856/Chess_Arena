@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { BotLevel, CreateGameOptions, GameMode, UserProfile } from '../types'
+import type { BotLevel, CreateGameOptions, FriendChallenge, GameMode, UserProfile } from '../types'
 import { BOT_LEVELS } from '../types'
 
 type Props = {
@@ -9,6 +9,11 @@ type Props = {
   apiBase: string
   checkServerHealth: () => Promise<boolean>
   user: UserProfile | null
+  tabLabel?: string
+  challenges?: FriendChallenge[]
+  requestCount?: number
+  onAcceptChallenge?: (challengeId: string) => Promise<void>
+  onDeclineChallenge?: (challengeId: string) => Promise<void>
   onOpenAuth: () => void
   onOpenProfile: () => void
   onOpenFriends: () => void
@@ -40,6 +45,11 @@ export function GameLobby({
   apiBase,
   checkServerHealth,
   user,
+  tabLabel,
+  challenges = [],
+  requestCount = 0,
+  onAcceptChallenge,
+  onDeclineChallenge,
   onOpenAuth,
   onOpenProfile,
   onOpenFriends,
@@ -49,6 +59,7 @@ export function GameLobby({
   const [busy, setBusy] = useState(false)
   const [serverOk, setServerOk] = useState<boolean | null>(null)
   const [botLevel, setBotLevel] = useState<BotLevel>('casual')
+  const [actionError, setActionError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -67,14 +78,18 @@ export function GameLobby({
 
   const run = async (action: () => Promise<void>) => {
     setBusy(true)
+    setActionError(null)
     try {
       await action()
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Request failed')
     } finally {
       setBusy(false)
     }
   }
 
   const canPlay = serverOk === true
+  const inboxCount = challenges.length + requestCount
 
   const modeCard = (
     key: string,
@@ -113,18 +128,53 @@ export function GameLobby({
 
   return (
     <div className="lobby">
+      {challenges.length > 0 && (
+        <section className="lobby-challenge-banner lobby-anim lobby-anim--delay-1" role="status">
+          {challenges.map((c) => {
+            const name = c.challengerDisplayName || c.challengerUsername || 'A friend'
+            return (
+              <div key={c.id} className="lobby-challenge-card">
+                <div>
+                  <strong>{name}</strong> challenged you to a match
+                </div>
+                <div className="draw-offer-buttons">
+                  <button
+                    type="button"
+                    className="lobby-join-btn"
+                    disabled={busy || !onAcceptChallenge}
+                    onClick={() => run(async () => onAcceptChallenge?.(c.id))}
+                  >
+                    Accept
+                  </button>
+                  <button
+                    type="button"
+                    className="sidebar-btn muted"
+                    disabled={busy || !onDeclineChallenge}
+                    onClick={() => run(async () => onDeclineChallenge?.(c.id))}
+                  >
+                    Decline
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </section>
+      )}
+
       <nav className="lobby-nav lobby-panel lobby-anim lobby-anim--delay-1">
         {user ? (
           <>
             <span className="lobby-user-pill">
               {user.displayName} · {user.eloRating} ELO
+              {tabLabel ? <span className="lobby-tab-label"> · tab {tabLabel}</span> : null}
             </span>
             <div className="lobby-nav-actions">
               <button type="button" className="sidebar-btn" onClick={onOpenProfile}>
                 Profile
               </button>
-              <button type="button" className="sidebar-btn" onClick={onOpenFriends}>
+              <button type="button" className="sidebar-btn lobby-nav-btn--badge" onClick={onOpenFriends}>
                 Friends
+                {inboxCount > 0 && <span className="lobby-inbox-badge">{inboxCount}</span>}
               </button>
               <button type="button" className="sidebar-btn" onClick={onOpenLeaderboard}>
                 Leaderboard
@@ -226,6 +276,7 @@ export function GameLobby({
       </section>
 
       {error && <p className="error lobby-error lobby-panel lobby-anim">{error}</p>}
+      {actionError && <p className="error lobby-error lobby-panel lobby-anim">{actionError}</p>}
 
       <section className="lobby-features lobby-panel lobby-anim lobby-anim--delay-9">
         <h3>What&apos;s included</h3>

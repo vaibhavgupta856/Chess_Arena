@@ -22,30 +22,38 @@ export function TileBoard({ theme, onSurfaceY }: TileBoardProps) {
       new THREE.BoxGeometry(8, BOARD_THICKNESS, 8),
       new THREE.MeshStandardMaterial({
         color: theme.boardEdge,
-        roughness: 0.88,
-        metalness: 0.04,
+        roughness: 0.9,
+        metalness: 0.03,
       }),
     )
     slab.position.y = -BOARD_THICKNESS / 2
-    slab.castShadow = true
     slab.receiveShadow = true
     group.add(slab)
 
-    const tileY = 0.002
+    // Two shared materials + one geometry → far fewer draw calls than 64 meshes.
+    const tileGeom = new THREE.PlaneGeometry(1, 1)
+    const lightMat = new THREE.MeshStandardMaterial({
+      color: theme.tileLight,
+      roughness: 0.7,
+      metalness: 0.04,
+    })
+    const darkMat = new THREE.MeshStandardMaterial({
+      color: theme.tileDark,
+      roughness: 0.7,
+      metalness: 0.04,
+    })
+
+    const lights: THREE.Object3D[] = []
+    const darks: THREE.Object3D[] = []
     for (const sq of allSquares()) {
-      const geom = new THREE.PlaneGeometry(1, 1)
-      const isLight = isLightSquare(sq.square)
-      const mat = new THREE.MeshStandardMaterial({
-        color: isLight ? theme.tileLight : theme.tileDark,
-        roughness: 0.6,
-        metalness: 0.05,
-      })
-      const mesh = new THREE.Mesh(geom, mat)
+      const mesh = new THREE.Mesh(tileGeom, isLightSquare(sq.square) ? lightMat : darkMat)
       mesh.rotation.x = -Math.PI / 2
-      mesh.position.set(sq.x, tileY, sq.z)
+      mesh.position.set(sq.x, 0.002, sq.z)
       mesh.receiveShadow = true
-      group.add(mesh)
+      ;(isLightSquare(sq.square) ? lights : darks).push(mesh)
     }
+    for (const m of lights) group.add(m)
+    for (const m of darks) group.add(m)
 
     return group
   }, [theme])

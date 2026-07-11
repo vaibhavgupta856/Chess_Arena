@@ -474,6 +474,60 @@
   color: var(--lobby-text);
 }
 
+.lobby-tab-label {
+  font-weight: 500;
+  opacity: 0.65;
+  font-size: 0.78rem;
+}
+
+.lobby-challenge-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-bottom: 0.25rem;
+}
+
+.lobby-challenge-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--lobby-accent) 55%, var(--lobby-border));
+  background: color-mix(in srgb, var(--lobby-accent) 18%, var(--lobby-surface));
+  color: var(--lobby-text);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.lobby-nav-btn--badge {
+  position: relative;
+}
+
+.lobby-inbox-badge {
+  position: absolute;
+  top: -0.35rem;
+  right: -0.35rem;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: #e11d48;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.15rem;
+  text-align: center;
+}
+
+.friends-section--alert {
+  padding: 0.75rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--lobby-accent) 45%, var(--lobby-border));
+  background: color-mix(in srgb, var(--lobby-accent) 12%, transparent);
+}
+
 .bot-level-picker {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));

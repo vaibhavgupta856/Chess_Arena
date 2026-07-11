@@ -43,13 +43,15 @@ export function AnimatedPiece({ piece, onDone, onClick, onHover }: AnimatedPiece
   const target = useRef(new THREE.Vector3(piece.targetX, piece.targetY, piece.targetZ))
   const reported = useRef(piece.done)
   const shouldJump = isKnightType(piece.pieceType) || piece.captured
+  const animating = !piece.done
 
   useEffect(() => {
     if (!groupRef.current) return
-    const pos = piece.done
-      ? new THREE.Vector3(piece.targetX, piece.targetY, piece.targetZ)
-      : new THREE.Vector3(piece.x, piece.y, piece.z)
-    groupRef.current.position.copy(pos)
+    groupRef.current.position.set(
+      piece.done ? piece.targetX : piece.x,
+      piece.done ? piece.targetY : piece.y,
+      piece.done ? piece.targetZ : piece.z,
+    )
   }, [piece.done, piece.x, piece.y, piece.z, piece.targetX, piece.targetY, piece.targetZ])
 
   useEffect(() => {
@@ -79,12 +81,8 @@ export function AnimatedPiece({ piece, onDone, onClick, onHover }: AnimatedPiece
   ])
 
   useFrame((_, delta) => {
-    if (!groupRef.current) return
-
-    if (piece.done) {
-      groupRef.current.position.set(piece.targetX, piece.targetY, piece.targetZ)
-      return
-    }
+    // Idle pieces must not pay a per-frame cost.
+    if (!animating || !groupRef.current) return
 
     progress.current = Math.min(1, progress.current + delta * (piece.captured ? 1.35 : 1.55))
     const t = easeInOutCubic(progress.current)

@@ -11,6 +11,13 @@ import type { CreateGameOptions, GameMode, GameState } from '../types'
 
 const API_BASE = getApiBase()
 
+/** Prefer the seat id the server assigned (user id when logged in). */
+function seatClientId(data: GameState, fallback: string): string {
+  if (data.yourColor === 'white' && data.whitePlayer) return data.whitePlayer
+  if (data.yourColor === 'black' && data.blackPlayer) return data.blackPlayer
+  return fallback
+}
+
 function normalizeGameState(data: GameState, clientId?: string): GameState {
   const mode = data.mode ?? 'local'
   const positionFens =
@@ -126,9 +133,12 @@ export function useGame() {
 
   const refreshGame = useCallback(async (id: string, clientId?: string) => {
     const cid = clientId ?? getGameClientId(id)
-    const res = await fetch(`${API_BASE}/games/${id}?clientId=${encodeURIComponent(cid)}`)
+    const res = await fetch(`${API_BASE}/games/${id}?clientId=${encodeURIComponent(cid)}`, {
+      headers: apiHeaders(),
+    })
     if (!res.ok) throw new Error(await res.text())
-    return normalizeGameState((await res.json()) as GameState, cid)
+    const data = normalizeGameState((await res.json()) as GameState, cid)
+    return normalizeGameState(data, seatClientId(data, cid))
   }, [])
 
   const createGame = useCallback(
@@ -159,7 +169,7 @@ export function useGame() {
         })
         if (!res.ok) throw new Error(await res.text())
         const data = (await res.json()) as GameState
-        applyGame(data, hostId, true, true)
+        applyGame(data, seatClientId(data, hostId), true, true)
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed to create game'
         if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
@@ -188,7 +198,7 @@ export function useGame() {
         })
         if (!res.ok) throw new Error(await res.text())
         const data = (await res.json()) as GameState
-        applyGame(data, tabId)
+        applyGame(data, seatClientId(data, tabId))
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to join game')
       }
@@ -207,7 +217,8 @@ export function useGame() {
       }
 
       if (isGameHostedInTab(gameId)) {
-        applyGame(await refreshGame(gameId, hostId), hostId)
+        const hosted = await refreshGame(gameId, hostId)
+        applyGame(hosted, seatClientId(hosted, hostId))
         return
       }
 
@@ -221,18 +232,20 @@ export function useGame() {
         })
         if (!res.ok) throw new Error(await res.text())
         const data = (await res.json()) as GameState
-        applyGame(data, tabId)
-        return
-      }
-
-      if (peek.whitePlayer === hostId || peek.blackPlayer === hostId) {
-        applyGame(peek, hostId)
+        applyGame(data, seatClientId(data, tabId))
         return
       }
 
       const tabId = getTabClientId()
-      if (peek.whitePlayer === tabId || peek.blackPlayer === tabId) {
-        applyGame(await refreshGame(gameId, tabId), tabId)
+      const candidates = [hostId, tabId, peek.whitePlayer, peek.blackPlayer].filter(Boolean)
+      for (const cid of candidates) {
+        if (cid && (peek.whitePlayer === cid || peek.blackPlayer === cid) && peek.yourColor) {
+          applyGame(await refreshGame(gameId, cid), cid)
+          return
+        }
+      }
+      if (peek.yourColor === 'white' || peek.yourColor === 'black') {
+        applyGame(peek, seatClientId(peek, hostId))
         return
       }
 
@@ -243,7 +256,7 @@ export function useGame() {
       })
       if (!res.ok) throw new Error(await res.text())
       const data = (await res.json()) as GameState
-      applyGame(data, tabId)
+      applyGame(data, seatClientId(data, tabId))
     },
     [applyGame, hostId, refreshGame],
   )

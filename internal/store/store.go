@@ -45,12 +45,14 @@ type Friend struct {
 }
 
 type Challenge struct {
-	ID           string    `json:"id"`
-	ChallengerID string    `json:"challengerId"`
-	OpponentID   string    `json:"opponentId"`
-	GameID       string    `json:"gameId"`
-	Status       string    `json:"status"`
-	CreatedAt    time.Time `json:"createdAt"`
+	ID                   string    `json:"id"`
+	ChallengerID         string    `json:"challengerId"`
+	ChallengerUsername   string    `json:"challengerUsername,omitempty"`
+	ChallengerDisplayName string   `json:"challengerDisplayName,omitempty"`
+	OpponentID           string    `json:"opponentId"`
+	GameID               string    `json:"gameId"`
+	Status               string    `json:"status"`
+	CreatedAt            time.Time `json:"createdAt"`
 }
 
 type Store struct {
@@ -372,7 +374,11 @@ func (s *Store) UpdateChallengeStatus(id, status string) error {
 
 func (s *Store) PendingChallengesFor(userID string) ([]Challenge, error) {
 	rows, err := s.db.Query(
-		`SELECT id, challenger_id, opponent_id, game_id, status, created_at FROM friend_challenges WHERE opponent_id = ? AND status = 'pending'`,
+		`SELECT c.id, c.challenger_id, u.username, u.display_name, c.opponent_id, c.game_id, c.status, c.created_at
+		 FROM friend_challenges c
+		 JOIN users u ON u.id = c.challenger_id
+		 WHERE c.opponent_id = ? AND c.status = 'pending'
+		 ORDER BY c.created_at DESC`,
 		userID,
 	)
 	if err != nil {
@@ -383,7 +389,10 @@ func (s *Store) PendingChallengesFor(userID string) ([]Challenge, error) {
 	for rows.Next() {
 		var c Challenge
 		var created string
-		if err := rows.Scan(&c.ID, &c.ChallengerID, &c.OpponentID, &c.GameID, &c.Status, &created); err != nil {
+		if err := rows.Scan(
+			&c.ID, &c.ChallengerID, &c.ChallengerUsername, &c.ChallengerDisplayName,
+			&c.OpponentID, &c.GameID, &c.Status, &created,
+		); err != nil {
 			return nil, err
 		}
 		c.CreatedAt, _ = time.Parse(time.RFC3339, created)

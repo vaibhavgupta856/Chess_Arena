@@ -1,6 +1,6 @@
 import './App.css'
 
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { ChessBoard2D } from './components/ChessBoard2D'
 
@@ -16,6 +16,7 @@ import { getLobbyUiColors } from './lib/themes'
 
 import { canPlayerMove, useGame } from './hooks/useGame'
 import { useAuth } from './hooks/useAuth'
+import { useFriends } from './hooks/useSocial'
 import { AuthPage } from './pages/AuthPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { FriendsPage } from './pages/FriendsPage'
@@ -25,12 +26,23 @@ import type { GameState } from './types'
 type ViewMode = '2d' | '3d'
 type LobbyView = 'play' | 'auth' | 'profile' | 'friends' | 'leaderboard'
 
-
+function seatForGame(g: GameState, fallback: string): string {
+  if (g.yourColor === 'white' && g.whitePlayer) return g.whitePlayer
+  if (g.yourColor === 'black' && g.blackPlayer) return g.blackPlayer
+  return fallback
+}
 
 function App() {
   const { theme } = useTheme()
-  const { user } = useAuth()
+  const { user, tabLabel } = useAuth()
   const lobbyUi = getLobbyUiColors(theme.background)
+  const {
+    challenges,
+    requests,
+    loadFriends,
+    acceptChallenge,
+    declineChallenge,
+  } = useFriends()
 
   const {
     game,
@@ -64,7 +76,22 @@ function App() {
 
   const canMove = game ? canPlayerMove(game, atLivePosition) : false
 
+  useEffect(() => {
+    if (!user || screen !== 'lobby') return
+    void loadFriends()
+    const id = window.setInterval(() => {
+      void loadFriends()
+    }, 4000)
+    return () => window.clearInterval(id)
+  }, [user, screen, loadFriends])
 
+  const joinFromSocial = useCallback(
+    (g: GameState, asHost = false) => {
+      enterGame(g, seatForGame(g, clientId), true, asHost)
+      setLobbyView('play')
+    },
+    [clientId, enterGame],
+  )
 
   if (screen === 'lobby') {
     return (
@@ -103,13 +130,7 @@ function App() {
           {lobbyView === 'auth' && <AuthPage onDone={() => setLobbyView('play')} />}
           {lobbyView === 'profile' && <ProfilePage onBack={() => setLobbyView('play')} />}
           {lobbyView === 'friends' && (
-            <FriendsPage
-              onBack={() => setLobbyView('play')}
-              onJoinGame={(g: GameState) => {
-                enterGame(g, clientId)
-                setLobbyView('play')
-              }}
-            />
+            <FriendsPage onBack={() => setLobbyView('play')} onJoinGame={joinFromSocial} />
           )}
           {lobbyView === 'leaderboard' && (
             <LeaderboardPage onBack={() => setLobbyView('play')} user={user} />
@@ -122,6 +143,17 @@ function App() {
               apiBase={apiBase}
               checkServerHealth={checkServerHealth}
               user={user}
+              tabLabel={tabLabel}
+              challenges={challenges}
+              requestCount={requests.length}
+              onAcceptChallenge={async (id) => {
+                const g = await acceptChallenge(id)
+                joinFromSocial(g, false)
+              }}
+              onDeclineChallenge={async (id) => {
+                await declineChallenge(id)
+                await loadFriends()
+              }}
               onOpenAuth={() => setLobbyView('auth')}
               onOpenProfile={() => setLobbyView('profile')}
               onOpenFriends={() => setLobbyView('friends')}
@@ -129,11 +161,8 @@ function App() {
             />
           )}
         </main>
-
       </div>
-
     )
-
   }
 
 
@@ -226,15 +255,17 @@ function App() {
                 </div>
               )}
 
-              <div className={`board-view${view === '3d' ? ' board-view--fullscreen' : ' board-view--hidden'}`}>
-                <ChessBoard3D
-                  game={game}
-                  displayFen={displayFen}
-                  atLivePosition={atLivePosition}
-                  canMove={canMove}
-                  onMove={submitMove}
-                />
-              </div>
+              {view === '3d' && (
+                <div className="board-view board-view--fullscreen">
+                  <ChessBoard3D
+                    game={game}
+                    displayFen={displayFen}
+                    atLivePosition={atLivePosition}
+                    canMove={canMove}
+                    onMove={submitMove}
+                  />
+                </div>
+              )}
 
             </div>
 

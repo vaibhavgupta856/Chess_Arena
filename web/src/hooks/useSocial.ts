@@ -61,7 +61,11 @@ export function useFriends() {
       body: JSON.stringify({ opponentId }),
     })
     if (!res.ok) throw new Error(await res.text())
-    return (await res.json()) as { gameId: string; challenge: FriendChallenge }
+    return (await res.json()) as {
+      gameId: string
+      challenge: FriendChallenge
+      game: GameState
+    }
   }, [])
 
   const acceptChallenge = useCallback(async (challengeId: string) => {
@@ -69,6 +73,15 @@ export function useFriends() {
     if (!res.ok) throw new Error(await res.text())
     return (await res.json()) as GameState
   }, [])
+
+  const declineChallenge = useCallback(
+    async (challengeId: string) => {
+      const res = await apiFetch(`/friends/challenge/${challengeId}/decline`, { method: 'POST' })
+      if (!res.ok) throw new Error(await res.text())
+      await loadFriends()
+    },
+    [loadFriends],
+  )
 
   return {
     friends,
@@ -82,6 +95,7 @@ export function useFriends() {
     respondRequest,
     challengeFriend,
     acceptChallenge,
+    declineChallenge,
   }
 }
 

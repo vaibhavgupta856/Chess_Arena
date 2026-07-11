@@ -158,6 +158,7 @@ func (s *server) gameStateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	clientID := r.URL.Query().Get("clientId")
+	clientID = s.playerIDForGame(r, clientID)
 	writeJSON(w, http.StatusOK, s.encodeState(session, clientID))
 }
 
@@ -177,13 +178,15 @@ func (s *server) joinHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "clientId required", http.StatusBadRequest)
 		return
 	}
-	color, err := session.join(req.ClientID)
+	// Prefer logged-in user id so two accounts in different tabs can be White/Black.
+	playerID := s.playerIDForGame(r, req.ClientID)
+	color, err := session.join(playerID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	s.broadcast(id)
-	state := s.encodeState(session, req.ClientID)
+	state := s.encodeState(session, playerID)
 	state.YourColor = color
 	writeJSON(w, http.StatusOK, state)
 }
@@ -552,7 +555,7 @@ func (s *server) wsHandler(w http.ResponseWriter, r *http.Request) {
 	s.mu.Unlock()
 
 	state, _ := s.getSession(id)
-	_ = conn.WriteJSON(s.encodeState(state, r.URL.Query().Get("clientId")))
+	_ = conn.WriteJSON(s.encodeState(state, s.playerIDForGame(r, r.URL.Query().Get("clientId"))))
 
 	for {
 		if _, _, err := conn.ReadMessage(); err != nil {
@@ -605,6 +608,7 @@ func main() {
 	mux.HandleFunc("GET /friends", s.friendsListHandler)
 	mux.HandleFunc("POST /friends/challenge", s.friendChallengeHandler)
 	mux.HandleFunc("POST /friends/challenge/{id}/accept", s.acceptChallengeHandler)
+	mux.HandleFunc("POST /friends/challenge/{id}/decline", s.declineChallengeHandler)
 	mux.HandleFunc("POST /games", s.newGameHandler)
 	mux.HandleFunc("GET /games/{id}", s.gameStateHandler)
 	mux.HandleFunc("POST /games/{id}/join", s.joinHandler)

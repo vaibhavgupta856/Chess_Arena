@@ -4,7 +4,7 @@ import type { GameState } from '../types'
 
 type Props = {
   onBack: () => void
-  onJoinGame: (game: GameState) => void
+  onJoinGame: (game: GameState, asHost?: boolean) => void
 }
 
 export function FriendsPage({ onBack, onJoinGame }: Props) {
@@ -20,16 +20,23 @@ export function FriendsPage({ onBack, onJoinGame }: Props) {
     respondRequest,
     challengeFriend,
     acceptChallenge,
+    declineChallenge,
   } = useFriends()
   const [query, setQuery] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [status, setStatus] = useState<string | null>(null)
 
   useEffect(() => {
     void loadFriends()
+    const id = window.setInterval(() => {
+      void loadFriends()
+    }, 4000)
+    return () => window.clearInterval(id)
   }, [loadFriends])
 
   const run = async (action: () => Promise<void>) => {
     setError(null)
+    setStatus(null)
     try {
       await action()
     } catch (err) {
@@ -92,26 +99,40 @@ export function FriendsPage({ onBack, onJoinGame }: Props) {
         )}
 
         {challenges.length > 0 && (
-          <section className="friends-section">
-            <h3>Challenges</h3>
+          <section className="friends-section friends-section--alert">
+            <h3>Incoming challenges</h3>
             <ul className="friends-list">
-              {challenges.map((c) => (
-                <li key={c.id}>
-                  <span>Challenge to play</span>
-                  <button
-                    type="button"
-                    className="sidebar-btn"
-                    onClick={() =>
-                      run(async () => {
-                        const game = await acceptChallenge(c.id)
-                        onJoinGame(game)
-                      })
-                    }
-                  >
-                    Accept &amp; play
-                  </button>
-                </li>
-              ))}
+              {challenges.map((c) => {
+                const name = c.challengerDisplayName || c.challengerUsername || 'A friend'
+                return (
+                  <li key={c.id}>
+                    <span>
+                      <strong>{name}</strong> challenged you
+                    </span>
+                    <div className="draw-offer-buttons">
+                      <button
+                        type="button"
+                        className="sidebar-btn"
+                        onClick={() =>
+                          run(async () => {
+                            const game = await acceptChallenge(c.id)
+                            onJoinGame(game, false)
+                          })
+                        }
+                      >
+                        Accept &amp; play
+                      </button>
+                      <button
+                        type="button"
+                        className="sidebar-btn muted"
+                        onClick={() => run(() => declineChallenge(c.id))}
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  </li>
+                )
+              })}
             </ul>
           </section>
         )}
@@ -132,9 +153,9 @@ export function FriendsPage({ onBack, onJoinGame }: Props) {
                     className="sidebar-btn"
                     onClick={() =>
                       run(async () => {
-                        const { gameId } = await challengeFriend(f.id)
-                        alert(`Challenge sent! Room: ${gameId}`)
-                        await loadFriends()
+                        setStatus(`Challenging ${f.displayName}…`)
+                        const { game } = await challengeFriend(f.id)
+                        onJoinGame(game, true)
                       })
                     }
                   >
@@ -146,6 +167,7 @@ export function FriendsPage({ onBack, onJoinGame }: Props) {
           )}
         </section>
 
+        {status && <p className="lobby-hint">{status}</p>}
         {error && <p className="error">{error}</p>}
         <button type="button" className="sidebar-btn muted" onClick={onBack}>
           Back to lobby
