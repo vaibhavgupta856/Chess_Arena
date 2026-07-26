@@ -436,7 +436,8 @@ export function useGame() {
     displayFen,
     atLivePosition,
     apiBase: API_BASE,
-    checkServerHealth: () => checkServerHealth(API_BASE),
+    checkServerHealth: (opts?: { onAttempt?: (attempt: number, max: number) => void }) =>
+      checkServerHealth(API_BASE, opts),
   }
 }
 

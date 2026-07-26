@@ -431,6 +431,7 @@ Align `GO_VERSION` on Render with the Go version you build against locally if de
 - **Games are not persisted** — restarting the API drops in-progress rooms; only accounts/friends/ELO survive in SQLite.
 - **Coach is offline for online PvP** — intentional so opponents cannot request engine help mid-match.
 - **Anonymous online seats** use client ids; ELO only applies when both players are registered users.
+- **Render free tier cold starts** — free web services sleep after ~15 minutes with no traffic and take about **one minute** to wake. This repo includes a GitHub Action (`.github/workflows/keep-alive.yml`) that pings `/health` every 10 minutes. Optionally set repo variable `RENDER_HEALTH_URL`, and/or add a free [UptimeRobot](https://uptimerobot.com) HTTP monitor on the same URL every 10 minutes (more reliable than GitHub cron). Keeping the service awake uses free instance hours (~720/month if always on; limit is 750).
 - Root `web/README.md` may still contain the default Vite template; this file is the project source of truth.
 
 ---

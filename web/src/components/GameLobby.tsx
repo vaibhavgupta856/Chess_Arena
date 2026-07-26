@@ -7,7 +7,7 @@ type Props = {
   onJoin: (gameId: string) => Promise<void>
   error: string | null
   apiBase: string
-  checkServerHealth: () => Promise<boolean>
+  checkServerHealth: (opts?: { onAttempt?: (attempt: number, max: number) => void }) => Promise<boolean>
   user: UserProfile | null
   tabLabel?: string
   challenges?: FriendChallenge[]
@@ -58,6 +58,7 @@ export function GameLobby({
   const [joinId, setJoinId] = useState('')
   const [busy, setBusy] = useState(false)
   const [serverOk, setServerOk] = useState<boolean | null>(null)
+  const [wakeStatus, setWakeStatus] = useState<string | null>(null)
   const [botLevel, setBotLevel] = useState<BotLevel>('casual')
   const [actionError, setActionError] = useState<string | null>(null)
 
@@ -66,10 +67,25 @@ export function GameLobby({
     void (async () => {
       if (!apiBase) {
         setServerOk(false)
+        setWakeStatus(null)
         return
       }
-      const ok = await checkServerHealth()
-      if (!cancelled) setServerOk(ok)
+      setServerOk(null)
+      setWakeStatus('Contacting chess server…')
+      const ok = await checkServerHealth({
+        onAttempt: (attempt, max) => {
+          if (cancelled) return
+          setWakeStatus(
+            attempt === 1
+              ? 'Contacting chess server…'
+              : `Waking free-tier server (${attempt}/${max}) — this can take up to a minute…`,
+          )
+        },
+      })
+      if (!cancelled) {
+        setServerOk(ok)
+        setWakeStatus(null)
+      }
     })()
     return () => {
       cancelled = true
@@ -211,14 +227,14 @@ export function GameLobby({
         className={`server-status lobby-panel lobby-anim lobby-anim--delay-3${serverOk === true ? ' server-status--ok' : serverOk === false ? ' server-status--bad' : ''}`}
       >
         <span className="server-status-dot" aria-hidden />
-        {serverOk === null && <p>Checking chess server…</p>}
+        {serverOk === null && <p>{wakeStatus ?? 'Checking chess server…'}</p>}
         {serverOk === true && <p>Server online — ready to play</p>}
         {serverOk === false && (
           <p>
             Server offline.
             {!apiBase
               ? ' Deploy the Go API and set VITE_API_BASE on Vercel.'
-              : ' Free tier may need ~30s to wake — refresh shortly.'}
+              : ' Render free tier sleeps after idle — wait ~1 min and refresh, or upgrade the API plan to avoid cold starts.'}
           </p>
         )}
       </div>

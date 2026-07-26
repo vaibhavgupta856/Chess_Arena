@@ -1,0 +1,40 @@
+# Ping the Render free-tier API often enough that it does not sleep
+# (Render spins down after ~15 minutes with no traffic).
+#
+# Optional repo variable: RENDER_HEALTH_URL
+#   e.g. https://chessarena-api.onrender.com/health
+#
+# Note: GitHub scheduled workflows can be delayed. If the API still sleeps,
+# add a free UptimeRobot / cron-job.org monitor on the same URL every 10 minutes.
+
+name: Keep API awake
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Wake Render service
+        env:
+          HEALTH_URL: ${{ vars.RENDER_HEALTH_URL }}
+        run: |
+          set -e
+          URL="${HEALTH_URL:-https://chessarena-api.onrender.com/health}"
+          echo "Pinging $URL"
+          # Cold start can take ~1 minute; retry a few times.
+          for attempt in 1 2 3 4 5; do
+            if curl -fsS --max-time 90 "$URL"; then
+              echo
+              echo "OK (attempt $attempt)"
+              exit 0
+            fi
+            echo "Attempt $attempt failed; retrying..."
+            sleep 10
+          done
+          echo "Health check failed"
+          exit 1

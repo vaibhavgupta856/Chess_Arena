@@ -147,20 +147,31 @@ export async function apiFetch(path: string, init?: RequestInit) {
   return res
 }
 
-export async function checkServerHealth(apiBase: string): Promise<boolean> {
+export async function checkServerHealth(
+  apiBase: string,
+  options?: { timeoutMs?: number; retries?: number; onAttempt?: (attempt: number, max: number) => void },
+): Promise<boolean> {
   if (!apiBase) return false
-  try {
-    const res = await fetch(`${apiBase}/health`, { signal: AbortSignal.timeout(8000) })
-    if (res.ok) return true
-  } catch {
-    // fall through
+  // Render free tier cold start is often ~30–60s; allow several long attempts.
+  const timeoutMs = options?.timeoutMs ?? 45000
+  const retries = options?.retries ?? 3
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    options?.onAttempt?.(attempt, retries)
+    try {
+      const res = await fetch(`${apiBase}/health`, { signal: AbortSignal.timeout(timeoutMs) })
+      if (res.ok) return true
+    } catch {
+      // try next / fallback path
+    }
+    try {
+      const res = await fetch(`${apiBase}/games`, { signal: AbortSignal.timeout(timeoutMs) })
+      if (res.status === 405 || res.ok) return true
+    } catch {
+      // continue retrying — service may still be spinning up
+    }
   }
-  try {
-    const res = await fetch(`${apiBase}/games`, { signal: AbortSignal.timeout(8000) })
-    return res.status === 405 || res.ok
-  } catch {
-    return false
-  }
+  return false
 }
 
 export { AUTH_RESET_EVENT }
