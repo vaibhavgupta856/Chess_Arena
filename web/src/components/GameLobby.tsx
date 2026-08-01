@@ -92,6 +92,15 @@ export function GameLobby({
     }
   }, [apiBase, checkServerHealth])
 
+  // While the lobby is open, ping the API so Render free tier stays warm.
+  useEffect(() => {
+    if (!apiBase || serverOk !== true) return
+    const id = window.setInterval(() => {
+      void fetch(`${apiBase}/health`, { signal: AbortSignal.timeout(15000) }).catch(() => {})
+    }, 5 * 60 * 1000)
+    return () => window.clearInterval(id)
+  }, [apiBase, serverOk])
+
   const run = async (action: () => Promise<void>) => {
     setBusy(true)
     setActionError(null)
