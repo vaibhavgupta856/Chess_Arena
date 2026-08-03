@@ -1,5 +1,5 @@
 import { OrbitControls } from '@react-three/drei'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
@@ -37,10 +37,25 @@ type Props = {
   cameraAngle: CameraAngleId
 }
 
+function useCoarsePointer() {
+  const [coarse, setCoarse] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(pointer: coarse)').matches : false,
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(pointer: coarse)')
+    const sync = () => setCoarse(mq.matches)
+    sync()
+    mq.addEventListener('change', sync)
+    return () => mq.removeEventListener('change', sync)
+  }, [])
+  return coarse
+}
+
 export function BoardCameraControls({ cameraMode, cameraAngle }: Props) {
   const controlsRef = useRef<OrbitControlsImpl>(null)
-  const { camera } = useThree()
+  const { camera, gl } = useThree()
   const free = cameraMode === 'free'
+  const coarsePointer = useCoarsePointer()
 
   useEffect(() => {
     if (cameraMode !== 'fixed') return
@@ -55,6 +70,12 @@ export function BoardCameraControls({ cameraMode, cameraAngle }: Props) {
     }
   }, [cameraMode, cameraAngle, camera])
 
+  // On phones, one-finger drag must not steal piece taps — rotate/zoom with two fingers.
+  useEffect(() => {
+    const el = gl.domElement
+    el.style.touchAction = coarsePointer ? 'manipulation' : 'none'
+  }, [gl, coarsePointer])
+
   return (
     <OrbitControls
       ref={controlsRef}
@@ -66,15 +87,25 @@ export function BoardCameraControls({ cameraMode, cameraAngle }: Props) {
       maxPolarAngle={Math.PI / 2.05}
       minDistance={9}
       maxDistance={18}
+      rotateSpeed={0.85}
+      zoomSpeed={0.9}
       mouseButtons={{
         LEFT: THREE.MOUSE.ROTATE,
         MIDDLE: THREE.MOUSE.DOLLY,
         RIGHT: THREE.MOUSE.ROTATE,
       }}
-      touches={{
-        ONE: THREE.TOUCH.ROTATE,
-        TWO: THREE.TOUCH.DOLLY_PAN,
-      }}
+      touches={
+        coarsePointer
+          ? {
+              // enablePan is false → one finger is ignored by controls → taps reach pieces
+              ONE: THREE.TOUCH.PAN,
+              TWO: THREE.TOUCH.DOLLY_ROTATE,
+            }
+          : {
+              ONE: THREE.TOUCH.ROTATE,
+              TWO: THREE.TOUCH.DOLLY_PAN,
+            }
+      }
     />
   )
 }

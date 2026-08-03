@@ -26,6 +26,7 @@ type Props = {
   atLivePosition: boolean
   canMove: boolean
   onMove: (uci: string) => void
+  hideCameraUi?: boolean
 }
 
 function rebuildSquareMap(pieces: Map<string, PieceVisual> | PieceVisual[]) {
@@ -511,49 +512,110 @@ function Scene({
   )
 }
 
-export function ChessBoard3D({ game, displayFen, atLivePosition, canMove, onMove }: Props) {
+function useNarrowScreen() {
+  const [narrow, setNarrow] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 900px)').matches : false,
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 900px)')
+    const sync = () => setNarrow(mq.matches)
+    sync()
+    mq.addEventListener('change', sync)
+    return () => mq.removeEventListener('change', sync)
+  }, [])
+  return narrow
+}
+
+export function ChessBoard3D({
+  game,
+  displayFen,
+  atLivePosition,
+  canMove,
+  onMove,
+  hideCameraUi = false,
+}: Props) {
   const { theme } = useTheme()
-  const [cameraMode, setCameraMode] = useState<CameraMode>('free')
+  const narrow = useNarrowScreen()
+  const [cameraMode, setCameraMode] = useState<CameraMode>(() =>
+    typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
+      ? 'fixed'
+      : 'free',
+  )
   const [cameraAngle, setCameraAngle] = useState<CameraAngleId>('corner-ne')
+  const [camOpen, setCamOpen] = useState(() =>
+    typeof window !== 'undefined' ? !window.matchMedia('(max-width: 900px)').matches : true,
+  )
+
+  useEffect(() => {
+    if (!narrow) setCamOpen(true)
+    else setCamOpen(false)
+  }, [narrow])
 
   return (
     <div className="board-3d">
-      <div className="board-3d-ui">
-        <div className="camera-controls">
-          <div className="camera-controls-row">
-            <span className="camera-controls-label">Camera</span>
+      {!hideCameraUi && (
+        <div className="board-3d-ui">
+          {!camOpen ? (
             <button
               type="button"
-              className={cameraMode === 'fixed' ? 'active' : ''}
-              onClick={() => setCameraMode('fixed')}
+              className="camera-controls-fab"
+              aria-expanded={false}
+              aria-label="Open camera options"
+              onClick={() => setCamOpen(true)}
             >
-              Fixed angles
+              Cam
             </button>
-            <button
-              type="button"
-              className={cameraMode === 'free' ? 'active' : ''}
-              onClick={() => setCameraMode('free')}
-              title="Drag to rotate; click a piece then a square to move; scroll to zoom"
-            >
-              Free drag
-            </button>
-          </div>
-          {cameraMode === 'fixed' && (
-            <div className="camera-controls-row camera-controls-angles">
-              {CAMERA_PRESETS.map((preset) => (
+          ) : (
+            <div className={`camera-controls${narrow ? ' camera-controls--compact' : ''}`}>
+              <div className="camera-controls-row">
+                <span className="camera-controls-label">Camera</span>
+                {narrow && (
+                  <button
+                    type="button"
+                    className="camera-controls-close"
+                    aria-label="Close camera options"
+                    onClick={() => setCamOpen(false)}
+                  >
+                    ✕
+                  </button>
+                )}
                 <button
-                  key={preset.id}
                   type="button"
-                  className={cameraAngle === preset.id ? 'active' : ''}
-                  onClick={() => setCameraAngle(preset.id)}
+                  className={cameraMode === 'fixed' ? 'active' : ''}
+                  onClick={() => setCameraMode('fixed')}
                 >
-                  {preset.label}
+                  Fixed
                 </button>
-              ))}
+                <button
+                  type="button"
+                  className={cameraMode === 'free' ? 'active' : ''}
+                  onClick={() => setCameraMode('free')}
+                  title="Two-finger rotate/zoom on touch; drag to rotate on desktop"
+                >
+                  Free
+                </button>
+              </div>
+              {cameraMode === 'fixed' && (
+                <div className="camera-controls-row camera-controls-angles">
+                  {CAMERA_PRESETS.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      className={cameraAngle === preset.id ? 'active' : ''}
+                      onClick={() => {
+                        setCameraAngle(preset.id)
+                        if (narrow) setCamOpen(false)
+                      }}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
-      </div>
+      )}
 
       <Canvas
         className="board-3d-canvas"

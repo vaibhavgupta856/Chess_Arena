@@ -125,8 +125,7 @@
 }
 
 .lobby-anim {
-  opacity: 0;
-  animation: lobby-fade-up 0.55s ease forwards;
+  animation: lobby-fade-up 0.55s ease both;
 }
 
 .lobby-anim--delay-1 { animation-delay: 0.05s; }
@@ -143,8 +142,7 @@
 .lobby-anim--delay-12 { animation-delay: 0.7s; }
 
 .lobby-chip-anim {
-  opacity: 0;
-  animation: lobby-chip-in 0.4s ease forwards;
+  animation: lobby-chip-in 0.4s ease both;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -235,6 +233,8 @@
   max-width: none;
   min-height: 0;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   padding: 0 clamp(1rem, 4vw, 2.5rem) clamp(1.5rem, 4vh, 2.5rem);
   box-sizing: border-box;
   display: flex;
@@ -466,6 +466,17 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
+}
+
+.server-status-offline {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.65rem;
+}
+
+.server-status-offline .lobby-join-btn {
+  min-height: 44px;
 }
 
 .lobby-user-pill {
@@ -1105,21 +1116,6 @@
     border-radius: 0;
   }
 
-  .camera-controls {
-    top: auto;
-    bottom: 4.25rem;
-    right: 0.5rem;
-    left: auto;
-    max-width: calc(100vw - 1rem);
-    padding: 0.5rem;
-    font-size: 0.75rem;
-  }
-
-  .camera-controls button {
-    padding: 0.28rem 0.55rem;
-    font-size: 0.72rem;
-  }
-
   .game-sidebar {
     position: fixed;
     left: 0;
@@ -1376,7 +1372,8 @@
   pointer-events: none;
 }
 
-.board-3d-ui .camera-controls {
+.board-3d-ui .camera-controls,
+.board-3d-ui .camera-controls-fab {
   pointer-events: auto;
 }
 
@@ -1494,18 +1491,45 @@
   position: fixed;
   top: 5.25rem;
   right: 1rem;
-  z-index: 200;
+  bottom: auto;
+  left: auto;
+  z-index: 130;
   pointer-events: auto;
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
+  width: max-content;
+  height: auto;
+  max-width: min(92vw, 320px);
+  max-height: none;
   padding: 0.65rem 0.75rem;
   border-radius: 12px;
   background: rgba(8, 12, 18, 0.94);
   border: 1px solid rgba(255, 255, 255, 0.22);
   backdrop-filter: blur(8px);
-  max-width: min(92vw, 320px);
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+}
+
+.camera-controls-fab {
+  display: none;
+  position: fixed;
+  bottom: calc(4.1rem + env(safe-area-inset-bottom, 0px));
+  right: 0.65rem;
+  z-index: 130;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(8, 12, 18, 0.94);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  pointer-events: auto;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  align-items: center;
+  justify-content: center;
 }
 
 .camera-controls-row {
@@ -1548,6 +1572,64 @@
 .camera-controls-angles {
   padding-top: 0.2rem;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.camera-controls-close {
+  margin-left: auto;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+/* Must come AFTER base .camera-controls — earlier mobile top:auto was overridden by top:5.25rem
+   while bottom still applied, stretching the panel over the whole board. */
+@media (max-width: 900px) {
+  .camera-controls-fab {
+    display: inline-flex;
+  }
+
+  .camera-controls,
+  .camera-controls--compact {
+    top: unset;
+    bottom: calc(4.1rem + env(safe-area-inset-bottom, 0px));
+    right: 0.5rem;
+    left: unset;
+    width: max-content;
+    height: auto;
+    max-width: min(15.5rem, calc(100vw - 1rem));
+    max-height: min(38svh, 240px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0.45rem 0.5rem;
+    font-size: 0.72rem;
+    z-index: 130;
+  }
+
+  .camera-controls-angles {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+    padding-bottom: 0.15rem;
+  }
+
+  .camera-controls-angles button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .camera-controls button {
+    padding: 0.28rem 0.55rem;
+    font-size: 0.72rem;
+  }
+
+  .camera-controls-close {
+    padding: 0;
+  }
 }
 
 .view-toggle {

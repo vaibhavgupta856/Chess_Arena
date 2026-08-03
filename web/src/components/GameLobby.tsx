@@ -113,8 +113,26 @@ export function GameLobby({
     }
   }
 
-  const canPlay = serverOk === true
+  const canPlay = serverOk !== false
   const inboxCount = challenges.length + requestCount
+
+  const retryHealth = () => {
+    setServerOk(null)
+    setWakeStatus('Contacting chess server…')
+    void (async () => {
+      const ok = await checkServerHealth({
+        onAttempt: (attempt, max) => {
+          setWakeStatus(
+            attempt === 1
+              ? 'Contacting chess server…'
+              : `Waking free-tier server (${attempt}/${max}) — this can take up to a minute…`,
+          )
+        },
+      })
+      setServerOk(ok)
+      setWakeStatus(null)
+    })()
+  }
 
   const modeCard = (
     key: string,
@@ -239,12 +257,19 @@ export function GameLobby({
         {serverOk === null && <p>{wakeStatus ?? 'Checking chess server…'}</p>}
         {serverOk === true && <p>Server online — ready to play</p>}
         {serverOk === false && (
-          <p>
-            Server offline.
-            {!apiBase
-              ? ' Deploy the Go API and set VITE_API_BASE on Vercel.'
-              : ' Render free tier sleeps after idle — wait ~1 min and refresh, or upgrade the API plan to avoid cold starts.'}
-          </p>
+          <div className="server-status-offline">
+            <p>
+              Server offline.
+              {!apiBase
+                ? ' Deploy the Go API and set VITE_API_BASE on Vercel.'
+                : ' Render free tier may be waking — wait a bit, then retry.'}
+            </p>
+            {apiBase && (
+              <button type="button" className="lobby-join-btn" onClick={retryHealth}>
+                Retry connection
+              </button>
+            )}
+          </div>
         )}
       </div>
 
