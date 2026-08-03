@@ -236,22 +236,8 @@ export function GameLobby({
         )}
       </nav>
 
-      <section className="lobby-hero lobby-panel lobby-anim lobby-anim--delay-2">
-        <div className="lobby-hero-badges">
-          <span className="lobby-badge">2D &amp; 3D</span>
-          <span className="lobby-badge">Online rooms</span>
-          <span className="lobby-badge">Vs bot</span>
-          <span className="lobby-badge">Coach</span>
-        </div>
-        <h2>Choose your battlefield</h2>
-        <p>
-          Instant procedural 3D pieces, adjustable bot strength, live multiplayer, and a built-in
-          coach — pick a mode and play in seconds.
-        </p>
-      </section>
-
       <div
-        className={`server-status lobby-panel lobby-anim lobby-anim--delay-3${serverOk === true ? ' server-status--ok' : serverOk === false ? ' server-status--bad' : ''}`}
+        className={`server-status lobby-panel lobby-anim lobby-anim--delay-2${serverOk === true ? ' server-status--ok' : serverOk === false ? ' server-status--bad' : ''}`}
       >
         <span className="server-status-dot" aria-hidden />
         {serverOk === null && <p>{wakeStatus ?? 'Checking chess server…'}</p>}
@@ -273,7 +259,17 @@ export function GameLobby({
         )}
       </div>
 
-      <section className="lobby-section lobby-panel lobby-anim lobby-anim--delay-4">
+      <section className="lobby-section lobby-play-now lobby-anim lobby-anim--delay-3">
+        <h3 className="lobby-section-title">Play now</h3>
+        <div className="lobby-grid">
+          {modeCard('bot', 'bot', 'Play vs Bot', 'Practice against the built-in engine.', 'white', 'lobby-anim--delay-3')}
+          {modeCard('bot-black', 'bot', 'Bot as White', 'You play Black; the bot moves first.', 'black', 'lobby-anim--delay-4')}
+          {modeCard('online', 'online', 'Online Room', 'Create a room and share the invite link.', undefined, 'lobby-anim--delay-5')}
+          {modeCard('local', 'local', 'Hot Seat', 'Two players, one device — both colors.', undefined, 'lobby-anim--delay-6')}
+        </div>
+      </section>
+
+      <section className="lobby-section lobby-panel lobby-anim lobby-anim--delay-6">
         <h3 className="lobby-section-title">Bot strength</h3>
         <div className="bot-level-picker">
           {BOT_LEVELS.map((level) => (
@@ -290,17 +286,7 @@ export function GameLobby({
         </div>
       </section>
 
-      <section className="lobby-section lobby-anim lobby-anim--delay-5">
-        <h3 className="lobby-section-title">Play now</h3>
-        <div className="lobby-grid">
-          {modeCard('bot', 'bot', 'Play vs Bot', 'Practice against the built-in engine.', 'white', 'lobby-anim--delay-5')}
-          {modeCard('bot-black', 'bot', 'Bot as White', 'You play Black; the bot moves first.', 'black', 'lobby-anim--delay-6')}
-          {modeCard('online', 'online', 'Online Room', 'Create a room and share the invite link.', undefined, 'lobby-anim--delay-7')}
-          {modeCard('local', 'local', 'Hot Seat', 'Two players, one device — both colors.', undefined, 'lobby-anim--delay-8')}
-        </div>
-      </section>
-
-      <section className="lobby-join lobby-panel lobby-anim lobby-anim--delay-8">
+      <section className="lobby-join lobby-panel lobby-anim lobby-anim--delay-7">
         <h3>Join a room</h3>
         <div className="lobby-join-row">
           <input
@@ -327,6 +313,20 @@ export function GameLobby({
 
       {error && <p className="error lobby-error lobby-panel lobby-anim">{error}</p>}
       {actionError && <p className="error lobby-error lobby-panel lobby-anim">{actionError}</p>}
+
+      <section className="lobby-hero lobby-panel lobby-anim lobby-anim--delay-8">
+        <div className="lobby-hero-badges">
+          <span className="lobby-badge">2D &amp; 3D</span>
+          <span className="lobby-badge">Online rooms</span>
+          <span className="lobby-badge">Vs bot</span>
+          <span className="lobby-badge">Coach</span>
+        </div>
+        <h2>Choose your battlefield</h2>
+        <p>
+          Instant procedural 3D pieces, adjustable bot strength, live multiplayer, and a built-in
+          coach — pick a mode and play in seconds.
+        </p>
+      </section>
 
       <section className="lobby-features lobby-panel lobby-anim lobby-anim--delay-9">
         <h3>What&apos;s included</h3>
