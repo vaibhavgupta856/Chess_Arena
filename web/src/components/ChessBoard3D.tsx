@@ -536,11 +536,7 @@ export function ChessBoard3D({
 }: Props) {
   const { theme } = useTheme()
   const narrow = useNarrowScreen()
-  const [cameraMode, setCameraMode] = useState<CameraMode>(() =>
-    typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
-      ? 'fixed'
-      : 'free',
-  )
+  const [cameraMode, setCameraMode] = useState<CameraMode>('free')
   const [cameraAngle, setCameraAngle] = useState<CameraAngleId>('corner-ne')
   const [camOpen, setCamOpen] = useState(() =>
     typeof window !== 'undefined' ? !window.matchMedia('(max-width: 900px)').matches : true,
@@ -590,7 +586,7 @@ export function ChessBoard3D({
                   type="button"
                   className={cameraMode === 'free' ? 'active' : ''}
                   onClick={() => setCameraMode('free')}
-                  title="Two-finger rotate/zoom on touch; drag to rotate on desktop"
+                  title="Drag to rotate; tap a piece then a square to move; pinch to zoom"
                 >
                   Free
                 </button>

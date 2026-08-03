@@ -68,11 +68,7 @@ function App() {
     clientId,
   } = useGame()
 
-  const [view, setView] = useState<ViewMode>(() =>
-    typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
-      ? '2d'
-      : '3d',
-  )
+  const [view, setView] = useState<ViewMode>('3d')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [lobbyView, setLobbyView] = useState<LobbyView>('play')
 
