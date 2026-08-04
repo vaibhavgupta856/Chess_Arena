@@ -35,12 +35,15 @@ export const CAMERA_PRESETS: CameraPreset[] = [
 type Props = {
   cameraMode: CameraMode
   cameraAngle: CameraAngleId
+  /** When false, orbit is locked (e.g. while dragging a piece). */
+  orbitEnabled?: boolean
 }
 
-export function BoardCameraControls({ cameraMode, cameraAngle }: Props) {
+export function BoardCameraControls({ cameraMode, cameraAngle, orbitEnabled = true }: Props) {
   const controlsRef = useRef<OrbitControlsImpl>(null)
   const { camera, gl } = useThree()
   const free = cameraMode === 'free'
+  const active = free && orbitEnabled
 
   useEffect(() => {
     if (cameraMode !== 'fixed') return
@@ -56,16 +59,21 @@ export function BoardCameraControls({ cameraMode, cameraAngle }: Props) {
   }, [cameraMode, cameraAngle, camera])
 
   useEffect(() => {
-    // none = one-finger drag goes to OrbitControls instead of the browser
     gl.domElement.style.touchAction = 'none'
   }, [gl])
+
+  useEffect(() => {
+    const controls = controlsRef.current
+    if (!controls) return
+    controls.enabled = active
+  }, [active])
 
   return (
     <OrbitControls
       ref={controlsRef}
-      enabled={free}
-      enableRotate={free}
-      enableZoom={free}
+      enabled={active}
+      enableRotate={active}
+      enableZoom={free && orbitEnabled}
       enablePan={false}
       minPolarAngle={0.25}
       maxPolarAngle={Math.PI / 2.05}
@@ -73,7 +81,6 @@ export function BoardCameraControls({ cameraMode, cameraAngle }: Props) {
       maxDistance={18}
       rotateSpeed={0.9}
       zoomSpeed={0.9}
-      // Short taps still fire piece/square clicks; drags rotate the camera
       mouseButtons={{
         LEFT: THREE.MOUSE.ROTATE,
         MIDDLE: THREE.MOUSE.DOLLY,

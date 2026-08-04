@@ -1,10 +1,12 @@
-import { Canvas, useFrame } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { ThreeEvent } from '@react-three/fiber'
 import type { MeshBasicMaterial } from 'three'
 import * as THREE from 'three'
 import type { GameState, BoardPiece } from '../types'
 import {
   allSquares,
+  coordToSquare,
   getBoardLayout,
   getSquareHitSize,
   SQUARE_HIGHLIGHT_SCALE,
@@ -192,6 +194,31 @@ function SquareHighlights({
   )
 }
 
+const DRAG_LIFT = 0.42
+const DRAG_THRESHOLD_PX = 8
+
+function boardPointFromClient(
+  clientX: number,
+  clientY: number,
+  camera: THREE.Camera,
+  domElement: HTMLCanvasElement,
+  surfaceY: number,
+  target: THREE.Vector3,
+  plane: THREE.Plane,
+  raycaster: THREE.Raycaster,
+  ndc: THREE.Vector2,
+): THREE.Vector3 | null {
+  const rect = domElement.getBoundingClientRect()
+  ndc.set(
+    ((clientX - rect.left) / rect.width) * 2 - 1,
+    -((clientY - rect.top) / rect.height) * 2 + 1,
+  )
+  plane.set(new THREE.Vector3(0, 1, 0), -surfaceY)
+  raycaster.setFromCamera(ndc, camera)
+  if (!raycaster.ray.intersectPlane(plane, target)) return null
+  return target
+}
+
 function Scene({
   game,
   displayFen,
@@ -202,14 +229,34 @@ function Scene({
   cameraAngle,
   theme,
 }: Props & { cameraMode: CameraMode; cameraAngle: CameraAngleId; theme: BoardTheme }) {
+  const { camera, gl } = useThree()
   const [selected, setSelected] = useState<string | null>(null)
   const [hovered, setHovered] = useState<string | null>(null)
   const [boardSurfaceY, setBoardSurfaceY] = useState(0.06)
   const [visualPieces, setVisualPieces] = useState<PieceVisual[]>([])
+  const [orbitEnabled, setOrbitEnabled] = useState(true)
+  const [dragVisual, setDragVisual] = useState<{
+    id: string
+    position: [number, number, number]
+  } | null>(null)
+
   const prevFenRef = useRef<string | null>(null)
   const squareToIdRef = useRef<Map<string, string>>(new Map())
   const idCounterRef = useRef(0)
   const captureCountRef = useRef({ white: 0, black: 0 })
+  const suppressClickRef = useRef(false)
+  const dragRef = useRef<{
+    id: string
+    fromSquare: string
+    pointerId: number
+    startX: number
+    startY: number
+    active: boolean
+  } | null>(null)
+  const planeRef = useRef(new THREE.Plane())
+  const raycasterRef = useRef(new THREE.Raycaster())
+  const ndcRef = useRef(new THREE.Vector2())
+  const hitRef = useRef(new THREE.Vector3())
 
   const pieces = useMemo(() => fenToPieces(displayFen), [displayFen])
   const turn = useMemo(() => (displayFen.split(' ')[1] === 'w' ? 'white' : 'black'), [displayFen])
@@ -218,6 +265,143 @@ function Scene({
     const [w, d] = getSquareHitSize('e4', layout)
     return new THREE.BoxGeometry(w, 0.04, d)
   }, [layout])
+
+  const endDrag = useCallback(
+    (clientX: number, clientY: number) => {
+      const drag = dragRef.current
+      dragRef.current = null
+      setOrbitEnabled(true)
+      setDragVisual(null)
+
+      if (!drag) return
+
+      try {
+        gl.domElement.releasePointerCapture(drag.pointerId)
+      } catch {
+        /* already released */
+      }
+
+      suppressClickRef.current = true
+      window.setTimeout(() => {
+        suppressClickRef.current = false
+      }, 40)
+
+      if (!drag.active) {
+        // Tap — keep click-to-move selection
+        setSelected(drag.fromSquare)
+        return
+      }
+
+      const hit = boardPointFromClient(
+        clientX,
+        clientY,
+        camera,
+        gl.domElement,
+        layout.surfaceY,
+        hitRef.current,
+        planeRef.current,
+        raycasterRef.current,
+        ndcRef.current,
+      )
+      const toSquare = hit ? coordToSquare(hit.x, hit.z, layout) : null
+      if (!toSquare || toSquare === drag.fromSquare) {
+        setSelected(drag.fromSquare)
+        return
+      }
+
+      const destPiece = pieces.find((p) => p.square === toSquare)
+      if (destPiece && destPiece.color === turn) {
+        setSelected(toSquare)
+        return
+      }
+
+      const moving = pieces.find((p) => p.square === drag.fromSquare)
+      onMove(buildUCI(drag.fromSquare, toSquare, turn, moving?.pieceType))
+      setSelected(null)
+    },
+    [camera, gl, layout, onMove, pieces, turn],
+  )
+
+  useEffect(() => {
+    const onMoveWindow = (event: PointerEvent) => {
+      const drag = dragRef.current
+      if (!drag || event.pointerId !== drag.pointerId) return
+
+      const dx = event.clientX - drag.startX
+      const dy = event.clientY - drag.startY
+      if (!drag.active && dx * dx + dy * dy >= DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) {
+        drag.active = true
+        setOrbitEnabled(false)
+        setSelected(drag.fromSquare)
+      }
+      if (!drag.active) return
+
+      const hit = boardPointFromClient(
+        event.clientX,
+        event.clientY,
+        camera,
+        gl.domElement,
+        layout.surfaceY,
+        hitRef.current,
+        planeRef.current,
+        raycasterRef.current,
+        ndcRef.current,
+      )
+      if (!hit) return
+
+      const square = coordToSquare(hit.x, hit.z, layout)
+      setHovered(square)
+      setDragVisual({
+        id: drag.id,
+        position: [hit.x, layout.surfaceY + DRAG_LIFT, hit.z],
+      })
+    }
+
+    const onUpWindow = (event: PointerEvent) => {
+      const drag = dragRef.current
+      if (!drag || event.pointerId !== drag.pointerId) return
+      endDrag(event.clientX, event.clientY)
+    }
+
+    window.addEventListener('pointermove', onMoveWindow)
+    window.addEventListener('pointerup', onUpWindow)
+    window.addEventListener('pointercancel', onUpWindow)
+    return () => {
+      window.removeEventListener('pointermove', onMoveWindow)
+      window.removeEventListener('pointerup', onUpWindow)
+      window.removeEventListener('pointercancel', onUpWindow)
+    }
+  }, [camera, endDrag, gl, layout])
+
+  const handleDragPointerDown = useCallback(
+    (square: string, event: ThreeEvent<PointerEvent>) => {
+      if (game.over || !canMove) return
+      const boardPiece = pieces.find((p) => p.square === square)
+      if (!boardPiece || boardPiece.color !== turn) return
+      const visual = visualPieces.find((p) => !p.captured && p.square === square)
+      if (!visual || !visual.done) return
+
+      event.stopPropagation()
+      const pointerId = event.pointerId
+      try {
+        gl.domElement.setPointerCapture(pointerId)
+      } catch {
+        /* ignore */
+      }
+
+      setOrbitEnabled(false)
+      setSelected(square)
+      dragRef.current = {
+        id: visual.id,
+        fromSquare: square,
+        pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        active: false,
+      }
+    },
+    [canMove, game.over, gl, pieces, turn, visualPieces],
+  )
 
   const initPieces = useCallback((fen: string) => {
     const next = fenToPieces(fen)
@@ -427,6 +611,7 @@ function Scene({
   }, [game.fen])
 
   const handleSquareClick = (square: string) => {
+    if (suppressClickRef.current || dragRef.current) return
     if (game.over || !canMove) return
 
     if (!selected) {
@@ -495,19 +680,35 @@ function Scene({
         />
       ))}
 
-      {visualPieces.map((piece) => (
-        <AnimatedPiece
-          key={piece.id}
-          piece={piece}
-          onDone={handlePieceDone}
-          onClick={handleSquareClick}
-          onHover={setHovered}
-        />
-      ))}
+      {visualPieces.map((piece) => {
+        const canDragPiece =
+          canMove &&
+          !game.over &&
+          !!piece.square &&
+          !piece.captured &&
+          piece.done &&
+          piece.color === turn
+        return (
+          <AnimatedPiece
+            key={piece.id}
+            piece={piece}
+            onDone={handlePieceDone}
+            onClick={handleSquareClick}
+            onHover={setHovered}
+            dragPosition={dragVisual?.id === piece.id ? dragVisual.position : null}
+            draggable={canDragPiece}
+            onDragPointerDown={handleDragPointerDown}
+          />
+        )
+      })}
 
       <SquareHighlights layout={layout} selected={selected} hovered={hovered} theme={theme} />
 
-      <BoardCameraControls cameraMode={cameraMode} cameraAngle={cameraAngle} />
+      <BoardCameraControls
+        cameraMode={cameraMode}
+        cameraAngle={cameraAngle}
+        orbitEnabled={orbitEnabled}
+      />
     </>
   )
 }
@@ -586,7 +787,7 @@ export function ChessBoard3D({
                   type="button"
                   className={cameraMode === 'free' ? 'active' : ''}
                   onClick={() => setCameraMode('free')}
-                  title="Drag to rotate; tap a piece then a square to move; pinch to zoom"
+                  title="Drag pieces to move, or tap piece then square; drag empty board to rotate"
                 >
                   Free
                 </button>

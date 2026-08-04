@@ -1,5 +1,6 @@
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useRef } from 'react'
+import type { ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { BoardPiece } from '../types'
 import { useTheme } from '../hooks/useTheme'
@@ -24,6 +25,9 @@ type AnimatedPieceProps = {
   onDone: (id: string) => void
   onClick: (square: string) => void
   onHover: (square: string | null) => void
+  dragPosition?: [number, number, number] | null
+  draggable?: boolean
+  onDragPointerDown?: (square: string, event: ThreeEvent<PointerEvent>) => void
 }
 
 function easeInOutCubic(t: number) {
@@ -34,7 +38,15 @@ function isKnightType(pieceType: string) {
   return pieceType.endsWith('N')
 }
 
-export function AnimatedPiece({ piece, onDone, onClick, onHover }: AnimatedPieceProps) {
+export function AnimatedPiece({
+  piece,
+  onDone,
+  onClick,
+  onHover,
+  dragPosition = null,
+  draggable = false,
+  onDragPointerDown,
+}: AnimatedPieceProps) {
   const { theme } = useTheme()
   const groupRef = useRef<THREE.Group>(null)
   const meshRef = useRef<THREE.Group>(null)
@@ -44,15 +56,16 @@ export function AnimatedPiece({ piece, onDone, onClick, onHover }: AnimatedPiece
   const reported = useRef(piece.done)
   const shouldJump = isKnightType(piece.pieceType) || piece.captured
   const animating = !piece.done
+  const isDragging = !!dragPosition
 
   useEffect(() => {
-    if (!groupRef.current) return
+    if (!groupRef.current || isDragging) return
     groupRef.current.position.set(
       piece.done ? piece.targetX : piece.x,
       piece.done ? piece.targetY : piece.y,
       piece.done ? piece.targetZ : piece.z,
     )
-  }, [piece.done, piece.x, piece.y, piece.z, piece.targetX, piece.targetY, piece.targetZ])
+  }, [piece.done, piece.x, piece.y, piece.z, piece.targetX, piece.targetY, piece.targetZ, isDragging])
 
   useEffect(() => {
     if (!piece.done) {
@@ -81,8 +94,18 @@ export function AnimatedPiece({ piece, onDone, onClick, onHover }: AnimatedPiece
   ])
 
   useFrame((_, delta) => {
-    // Idle pieces must not pay a per-frame cost.
-    if (!animating || !groupRef.current) return
+    if (!groupRef.current) return
+
+    if (dragPosition) {
+      groupRef.current.position.set(dragPosition[0], dragPosition[1], dragPosition[2])
+      if (meshRef.current) {
+        meshRef.current.scale.setScalar(1.08)
+        meshRef.current.rotation.set(0, 0, 0)
+      }
+      return
+    }
+
+    if (!animating) return
 
     progress.current = Math.min(1, progress.current + delta * (piece.captured ? 1.35 : 1.55))
     const t = easeInOutCubic(progress.current)
@@ -122,9 +145,14 @@ export function AnimatedPiece({ piece, onDone, onClick, onHover }: AnimatedPiece
     <group
       ref={groupRef}
       onClick={(e) => {
-        if (piece.captured || !piece.square) return
+        if (piece.captured || !piece.square || isDragging) return
         e.stopPropagation()
         onClick(piece.square)
+      }}
+      onPointerDown={(e) => {
+        if (piece.captured || !piece.square || !draggable || !onDragPointerDown) return
+        e.stopPropagation()
+        onDragPointerDown(piece.square, e)
       }}
       onPointerEnter={(e) => {
         if (piece.captured || !piece.square) return
