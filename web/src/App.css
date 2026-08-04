@@ -33,6 +33,117 @@
   opacity: 0.95;
 }
 
+.game-banner-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  padding: 1.25rem;
+  box-sizing: border-box;
+}
+
+.game-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  max-width: min(92vw, 28rem);
+  text-align: center;
+  padding: 1.1rem 1.5rem;
+  border-radius: 18px;
+  background: rgba(6, 10, 16, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+  color: #f8fafc;
+}
+
+.game-banner-title {
+  font-size: clamp(2.4rem, 9vw, 4.5rem);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.05;
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+}
+
+.game-banner-title--tip {
+  font-size: clamp(1.15rem, 4.2vw, 1.55rem);
+  letter-spacing: 0.02em;
+  font-weight: 700;
+}
+
+.game-banner-sub {
+  font-size: clamp(0.95rem, 3.2vw, 1.15rem);
+  opacity: 0.9;
+  line-height: 1.35;
+}
+
+.game-banner--tip {
+  animation: game-banner-fade 6s ease forwards;
+}
+
+.game-banner--check {
+  animation: game-banner-fade 2s ease forwards;
+}
+
+.game-banner--check .game-banner-title {
+  color: #fdba74;
+}
+
+.game-banner--checkmate {
+  animation: game-banner-in 0.7s ease forwards;
+  padding: 1.4rem 1.75rem;
+}
+
+.game-banner--checkmate .game-banner-title {
+  color: #fda4af;
+  font-size: clamp(2.8rem, 11vw, 5.5rem);
+}
+
+@keyframes game-banner-fade {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  12% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  78% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px) scale(1.02);
+  }
+}
+
+@keyframes game-banner-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-banner--tip,
+  .game-banner--check,
+  .game-banner--checkmate {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
 .app--game > .app-header,
 .app--game > .game-layout {
   position: relative;

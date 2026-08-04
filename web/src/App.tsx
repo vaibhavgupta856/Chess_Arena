@@ -11,6 +11,7 @@ import { GameLobby } from './components/GameLobby'
 import { GameSidebar } from './components/GameSidebar'
 import { MobileGameBar } from './components/MobileGameBar'
 import { ThemePicker } from './components/ThemePicker'
+import { GameStatusOverlays } from './components/GameStatusOverlays'
 import { useTheme } from './hooks/useTheme'
 import { getLobbyUiColors, getRoomAtmosphere } from './lib/themes'
 
@@ -277,6 +278,8 @@ function App() {
                   />
                 </div>
               )}
+
+              <GameStatusOverlays game={game} />
 
             </div>
 
