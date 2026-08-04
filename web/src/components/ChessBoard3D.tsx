@@ -14,6 +14,7 @@ import {
   type BoardLayout,
 } from '../lib/boardLayout'
 import { buildUCI, diffBoardTransition, fenToPieces } from '../lib/fen'
+import { getApiBase } from '../lib/api'
 import { valhallaSlotPosition } from '../lib/valhalla'
 import { AnimatedPiece, type PieceVisual } from './AnimatedPiece'
 import { BoardCameraControls, CAMERA_PRESETS, type CameraAngleId, type CameraMode } from './BoardCameraControls'
@@ -127,14 +128,20 @@ function SquareHighlights({
   layout,
   selected,
   hovered,
+  legalTargets,
+  occupiedTargets,
   theme,
 }: {
   layout: BoardLayout
   selected: string | null
   hovered: string | null
+  legalTargets: string[]
+  occupiedTargets: Set<string>
   theme: BoardTheme
 }) {
   const selectMat = useRef<MeshBasicMaterial>(null)
+  const dotGeo = useMemo(() => new THREE.CircleGeometry(0.13, 24), [])
+  const ringGeo = useMemo(() => new THREE.RingGeometry(0.3, 0.4, 36), [])
 
   const selectedPos = selected ? layout.squares.get(selected) : null
   const hoveredPos =
@@ -144,6 +151,7 @@ function SquareHighlights({
   const hoveredSize = hovered && hovered !== selected ? getSquareHitSize(hovered, layout) : null
 
   const lift = layout.surfaceY + 0.0035
+  const markerY = layout.surfaceY + 0.008
   const highlightThickness = 0.006
 
   useFrame(({ clock }) => {
@@ -154,6 +162,28 @@ function SquareHighlights({
 
   return (
     <group>
+      {legalTargets.map((square) => {
+        const pos = layout.squares.get(square)
+        if (!pos) return null
+        const isCapture = occupiedTargets.has(square)
+        return (
+          <mesh
+            key={`legal-${square}`}
+            position={[pos.x, markerY, pos.z]}
+            rotation={[-Math.PI / 2, 0, 0]}
+            geometry={isCapture ? ringGeo : dotGeo}
+            renderOrder={18}
+          >
+            <meshBasicMaterial
+              color={isCapture ? theme.highlightHover : theme.highlightSelect}
+              transparent
+              opacity={isCapture ? 0.72 : 0.55}
+              depthTest={false}
+              depthWrite={false}
+            />
+          </mesh>
+        )
+      })}
       {selectedPos && selectedSize && (
         <mesh position={[selectedPos.x, lift, selectedPos.z]} renderOrder={20}>
           <boxGeometry
@@ -240,12 +270,14 @@ function Scene({
     id: string
     position: [number, number, number]
   } | null>(null)
+  const [legalUcis, setLegalUcis] = useState<string[]>([])
 
   const prevFenRef = useRef<string | null>(null)
   const squareToIdRef = useRef<Map<string, string>>(new Map())
   const idCounterRef = useRef(0)
   const captureCountRef = useRef({ white: 0, black: 0 })
   const suppressClickRef = useRef(false)
+  const legalTargetsRef = useRef<string[]>([])
   const dragRef = useRef<{
     id: string
     fromSquare: string
@@ -267,6 +299,56 @@ function Scene({
     const [w, d] = getSquareHitSize('e4', layout)
     return new THREE.BoxGeometry(w, 0.04, d)
   }, [layout])
+
+  const legalTargets = useMemo(() => {
+    if (!selected) return []
+    return legalUcis
+      .filter((uci) => uci.length >= 4 && uci.slice(0, 2) === selected)
+      .map((uci) => uci.slice(2, 4))
+  }, [legalUcis, selected])
+
+  const occupiedTargets = useMemo(() => {
+    const set = new Set<string>()
+    for (const p of pieces) {
+      if (legalTargets.includes(p.square)) set.add(p.square)
+    }
+    return set
+  }, [pieces, legalTargets])
+
+  useEffect(() => {
+    legalTargetsRef.current = legalTargets
+  }, [legalTargets])
+
+  useEffect(() => {
+    setSelected(null)
+  }, [game.fen])
+
+  useEffect(() => {
+    if (!canMove || game.over || !atLivePosition) {
+      setLegalUcis([])
+      return
+    }
+    const base = getApiBase()
+    if (!base) {
+      setLegalUcis([])
+      return
+    }
+    let cancelled = false
+    void fetch(`${base}/games/${encodeURIComponent(game.id)}/moves`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(await res.text())
+        return res.json() as Promise<{ uci: string }[]>
+      })
+      .then((moves) => {
+        if (!cancelled) setLegalUcis(moves.map((m) => m.uci))
+      })
+      .catch(() => {
+        if (!cancelled) setLegalUcis([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [game.id, game.fen, canMove, game.over, atLivePosition])
 
   const endDrag = useCallback(
     (clientX: number, clientY: number) => {
@@ -307,6 +389,11 @@ function Scene({
       )
       const toSquare = hit ? coordToSquare(hit.x, hit.z, layout) : null
       if (!toSquare || toSquare === drag.fromSquare) {
+        setSelected(drag.fromSquare)
+        return
+      }
+
+      if (!legalTargetsRef.current.includes(toSquare)) {
         setSelected(drag.fromSquare)
         return
       }
@@ -635,6 +722,11 @@ function Scene({
       return
     }
 
+    if (!legalTargets.includes(square)) {
+      setSelected(null)
+      return
+    }
+
     const moving = pieces.find((p) => p.square === selected)
     onMove(buildUCI(selected, square, turn, moving?.pieceType))
     setSelected(null)
@@ -703,7 +795,14 @@ function Scene({
         )
       })}
 
-      <SquareHighlights layout={layout} selected={selected} hovered={hovered} theme={theme} />
+      <SquareHighlights
+        layout={layout}
+        selected={selected}
+        hovered={hovered}
+        legalTargets={legalTargets}
+        occupiedTargets={occupiedTargets}
+        theme={theme}
+      />
 
       <BoardCameraControls
         cameraMode={cameraMode}
