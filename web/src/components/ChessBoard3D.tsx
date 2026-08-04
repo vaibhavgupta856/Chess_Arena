@@ -17,10 +17,11 @@ import { buildUCI, diffBoardTransition, fenToPieces } from '../lib/fen'
 import { valhallaSlotPosition } from '../lib/valhalla'
 import { AnimatedPiece, type PieceVisual } from './AnimatedPiece'
 import { BoardCameraControls, CAMERA_PRESETS, type CameraAngleId, type CameraMode } from './BoardCameraControls'
+import { RoomBackdrop } from './RoomBackdrop'
 import { TileBoard } from './TileBoard'
 import { ValhallaPlatforms } from './ValhallaPlatforms'
 import { useTheme } from '../hooks/useTheme'
-import type { BoardTheme } from '../lib/themes'
+import { getRoomAtmosphere, type BoardTheme } from '../lib/themes'
 
 type Props = {
   game: GameState
@@ -261,6 +262,7 @@ function Scene({
   const pieces = useMemo(() => fenToPieces(displayFen), [displayFen])
   const turn = useMemo(() => (displayFen.split(' ')[1] === 'w' ? 'white' : 'black'), [displayFen])
   const layout = useMemo(() => getBoardLayout(boardSurfaceY), [boardSurfaceY])
+  const atmosphere = useMemo(() => getRoomAtmosphere(theme), [theme])
   const hitGeometry = useMemo(() => {
     const [w, d] = getSquareHitSize('e4', layout)
     return new THREE.BoxGeometry(w, 0.04, d)
@@ -640,11 +642,14 @@ function Scene({
 
   return (
     <>
-      <ambientLight intensity={1.15} />
-      <hemisphereLight args={['#d4ecff', '#2a5240', 0.45]} />
+      <fog attach="fog" args={[atmosphere.fog, atmosphere.fogNear, atmosphere.fogFar]} />
+      <RoomBackdrop atmosphere={atmosphere} />
+
+      <ambientLight intensity={0.95} />
+      <hemisphereLight args={[atmosphere.hemiSky, atmosphere.hemiGround, 0.55]} />
       <directionalLight
         position={[6, 14, 5]}
-        intensity={1.15}
+        intensity={1.2}
         castShadow
         shadow-mapSize={[1024, 1024]}
         shadow-bias={-0.0002}
@@ -655,12 +660,8 @@ function Scene({
         shadow-camera-top={9}
         shadow-camera-bottom={-9}
       />
-      <directionalLight position={[-5, 8, -4]} intensity={0.35} />
-
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.52, 0]} receiveShadow>
-        <planeGeometry args={[28, 28]} />
-        <meshStandardMaterial color={theme.ground} roughness={0.95} metalness={0.02} />
-      </mesh>
+      <directionalLight position={[-5, 8, -4]} intensity={0.4} color={atmosphere.skyHorizon} />
+      <pointLight position={[0, 7, 0]} intensity={0.35} distance={22} color={atmosphere.skyTop} />
 
       <Suspense fallback={null}>
         <TileBoard theme={theme} onSurfaceY={setBoardSurfaceY} />
@@ -826,7 +827,6 @@ export function ChessBoard3D({
         onContextMenu={(e) => e.preventDefault()}
       >
         <color attach="background" args={[theme.background]} />
-        <fog attach="fog" args={[theme.fog, 16, 32]} />
         <Suspense fallback={null}>
           <Scene
             game={game}

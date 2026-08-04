@@ -135,10 +135,73 @@ function parseHexColor(hex: string) {
   }
 }
 
+function toHex({ r, g, b }: { r: number; g: number; b: number }) {
+  const clamp = (n: number) => Math.max(0, Math.min(255, Math.round(n)))
+  return `#${[clamp(r), clamp(g), clamp(b)].map((n) => n.toString(16).padStart(2, '0')).join('')}`
+}
+
+function mixHex(a: string, b: string, t: number) {
+  const A = parseHexColor(a)
+  const B = parseHexColor(b)
+  return toHex({
+    r: A.r + (B.r - A.r) * t,
+    g: A.g + (B.g - A.g) * t,
+    b: A.b + (B.b - A.b) * t,
+  })
+}
+
+function shiftHex(hex: string, amount: number) {
+  const { r, g, b } = parseHexColor(hex)
+  return toHex({ r: r + amount, g: g + amount, b: b + amount })
+}
+
 function isColorDark(hex: string): boolean {
   const { r, g, b } = parseHexColor(hex)
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
   return luminance < 0.52
+}
+
+export type RoomAtmosphere = {
+  skyTop: string
+  skyHorizon: string
+  fog: string
+  fogNear: number
+  fogFar: number
+  groundInner: string
+  groundOuter: string
+  hemiSky: string
+  hemiGround: string
+  cssBackground: string
+  glow: string
+  vignette: string
+}
+
+/** Derived room lighting / backdrop colors for the active board theme. */
+export function getRoomAtmosphere(theme: BoardTheme): RoomAtmosphere {
+  const dark = isColorDark(theme.background)
+  const skyTop = dark ? shiftHex(theme.background, -18) : shiftHex(theme.background, 28)
+  const skyHorizon = mixHex(theme.fog, theme.background, 0.35)
+  const groundInner = mixHex(theme.ground, theme.tileDark, 0.22)
+  const groundOuter = shiftHex(theme.ground, dark ? -10 : -28)
+  const glow = `${theme.tileLight}55`
+  const vignette = dark ? 'rgba(0, 0, 0, 0.55)' : 'rgba(8, 16, 28, 0.28)'
+
+  return {
+    skyTop,
+    skyHorizon,
+    fog: theme.fog,
+    fogNear: 18,
+    fogFar: 42,
+    groundInner,
+    groundOuter,
+    hemiSky: mixHex(theme.background, '#ffffff', dark ? 0.12 : 0.35),
+    hemiGround: mixHex(theme.ground, theme.tileDark, 0.4),
+    cssBackground: dark
+      ? `radial-gradient(ellipse 120% 80% at 50% 18%, ${shiftHex(theme.background, 30)} 0%, ${theme.background} 42%, ${groundOuter} 100%)`
+      : `radial-gradient(ellipse 110% 85% at 50% 12%, ${skyTop} 0%, ${theme.background} 48%, ${mixHex(theme.background, theme.ground, 0.45)} 100%)`,
+    glow,
+    vignette,
+  }
 }
 
 export type LobbyUiColors = {

@@ -12,7 +12,7 @@ import { GameSidebar } from './components/GameSidebar'
 import { MobileGameBar } from './components/MobileGameBar'
 import { ThemePicker } from './components/ThemePicker'
 import { useTheme } from './hooks/useTheme'
-import { getLobbyUiColors } from './lib/themes'
+import { getLobbyUiColors, getRoomAtmosphere } from './lib/themes'
 
 import { canPlayerMove, useGame } from './hooks/useGame'
 import { useAuth } from './hooks/useAuth'
@@ -36,6 +36,7 @@ function App() {
   const { theme } = useTheme()
   const { user, tabLabel } = useAuth()
   const lobbyUi = getLobbyUiColors(theme.background)
+  const roomAtmosphere = getRoomAtmosphere(theme)
   const {
     challenges,
     requests,
@@ -169,7 +170,16 @@ function App() {
 
   return (
 
-    <div className={`app app--game${is3d ? ' app--fullscreen' : ''}`}>
+    <div
+      className={`app app--game${is3d ? ' app--fullscreen' : ''}`}
+      style={{
+        background: roomAtmosphere.cssBackground,
+        ['--room-glow' as string]: roomAtmosphere.glow,
+        ['--room-vignette' as string]: roomAtmosphere.vignette,
+        ['--room-horizon' as string]: roomAtmosphere.skyHorizon,
+      }}
+    >
+      <div className="room-bg-decor" aria-hidden />
 
       <header className="app-header">
 
