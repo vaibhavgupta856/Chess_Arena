@@ -104,6 +104,16 @@
   font-size: clamp(2.8rem, 11vw, 5.5rem);
 }
 
+.game-banner--timeout {
+  animation: game-banner-in 0.7s ease forwards;
+  padding: 1.4rem 1.75rem;
+}
+
+.game-banner--timeout .game-banner-title {
+  color: #fcd34d;
+  font-size: clamp(2.8rem, 11vw, 5.5rem);
+}
+
 @keyframes game-banner-fade {
   0% {
     opacity: 0;
@@ -137,7 +147,8 @@
 @media (prefers-reduced-motion: reduce) {
   .game-banner--tip,
   .game-banner--check,
-  .game-banner--checkmate {
+  .game-banner--checkmate,
+  .game-banner--timeout {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
@@ -721,6 +732,135 @@
   background: var(--lobby-surface-hover);
 }
 
+.time-control-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+  gap: 0.45rem;
+}
+
+.time-control-picker button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  padding: 0.55rem 0.65rem;
+  min-height: 42px;
+  border-radius: 12px;
+  border: 1px solid var(--lobby-border);
+  background: var(--lobby-surface);
+  color: var(--lobby-text);
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.time-control-picker button:hover {
+  transform: translateY(-1px);
+  border-color: var(--lobby-accent);
+}
+
+.time-control-picker button:active {
+  transform: scale(0.98);
+}
+
+.time-control-picker button span {
+  font-size: 0.72rem;
+  color: var(--lobby-text-muted);
+}
+
+.time-control-picker button.active {
+  border-color: var(--lobby-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--lobby-accent) 35%, transparent);
+  transform: scale(1.02);
+  background: var(--lobby-surface-hover);
+}
+
+.game-clocks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+  margin: 0.65rem 0 0.35rem;
+}
+
+.game-clocks-meta {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.72rem;
+  opacity: 0.7;
+}
+
+.game-clock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f8fafc;
+}
+
+.game-clock-label {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.game-clock-time {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.game-clock.is-active {
+  border-color: color-mix(in srgb, var(--accent, #aa3bff) 70%, white);
+  background: color-mix(in srgb, var(--accent, #aa3bff) 22%, rgba(8, 12, 18, 0.9));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent, #aa3bff) 35%, transparent);
+}
+
+.game-clock.is-low .game-clock-time {
+  color: #fdba74;
+}
+
+.game-clock.is-critical {
+  border-color: rgba(248, 113, 113, 0.65);
+  background: rgba(127, 29, 29, 0.35);
+}
+
+.game-clock.is-critical .game-clock-time {
+  color: #fecaca;
+}
+
+.game-clocks--compact {
+  margin: 0.2rem 0 0;
+  gap: 0.3rem;
+}
+
+.game-clocks--compact .game-clock {
+  padding: 0.2rem 0.4rem;
+  border-radius: 8px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+}
+
+.game-clocks--compact .game-clock-label {
+  font-size: 0.58rem;
+}
+
+.game-clocks--compact .game-clock-time {
+  font-size: 0.85rem;
+}
+
+.game-clocks--compact .game-clocks-meta {
+  display: none;
+}
+
 .lobby-card-level {
   font-size: 0.75rem;
   color: var(--lobby-text-muted);
@@ -1209,7 +1349,7 @@
     width: 100%;
     max-width: none;
     height: 100svh;
-    padding-bottom: 3.6rem;
+    padding-bottom: 5.4rem;
     box-sizing: border-box;
   }
 
@@ -1335,6 +1475,7 @@
 
   .mobile-game-bar-status {
     min-width: 0;
+    flex: 1;
     text-align: left;
   }
 
@@ -1349,10 +1490,11 @@
   }
 
   .mobile-game-bar-meta {
-    display: block;
-    font-size: 0.68rem;
-    opacity: 0.7;
-    color: #e5e7eb;
+    display: none;
+  }
+
+  .mobile-game-bar .game-clocks--compact {
+    max-width: 11.5rem;
   }
 
   .mobile-game-bar-actions {
@@ -1481,6 +1623,15 @@
 
   .bot-level-picker {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .time-control-picker {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .time-control-picker button {
+    padding: 0.45rem 0.5rem;
+    min-height: 40px;
   }
 
   .bot-level-picker button {

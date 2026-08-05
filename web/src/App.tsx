@@ -187,28 +187,23 @@ function App() {
         <h1>ChessArena</h1>
 
         <p>
-
           {game
-
             ? game.over
-
-              ? `Game over — ${game.outcome}`
-
+              ? `Game over — ${game.outcome}${
+                  game.termination && game.termination !== 'none'
+                    ? ` (${game.termination.replaceAll('_', ' ')})`
+                    : ''
+                }`
               : !atLivePosition
-
                 ? `Reviewing move ${viewPly}`
-
                 : game.botThinking
                   ? 'Bot is thinking…'
                   : game.waitingFor === 'black' && game.yourColor === 'white'
-                  ? 'You are White — share invite link for opponent'
-                  : game.waitingFor
-                    ? `Waiting for opponent (${game.waitingFor})…`
-
-                  : `${game.turn} to move${game.inCheck ? ' — check!' : ''}`
-
+                    ? 'You are White — share invite link for opponent'
+                    : game.waitingFor
+                      ? `Waiting for opponent (${game.waitingFor})…`
+                      : `${game.turn} to move${game.inCheck ? ' — check!' : ''}`
             : 'Loading…'}
-
         </p>
 
         <div className="view-toggle">

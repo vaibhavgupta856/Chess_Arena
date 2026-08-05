@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react'
-import type { BotLevel, CreateGameOptions, FriendChallenge, GameMode, UserProfile } from '../types'
-import { BOT_LEVELS } from '../types'
+import type {
+  BotLevel,
+  CreateGameOptions,
+  FriendChallenge,
+  GameMode,
+  TimeControlId,
+  UserProfile,
+} from '../types'
+import { BOT_LEVELS, DEFAULT_TIME_CONTROL, TIME_CONTROLS } from '../types'
 
 type Props = {
   onCreate: (options: CreateGameOptions) => Promise<void>
@@ -60,6 +67,7 @@ export function GameLobby({
   const [serverOk, setServerOk] = useState<boolean | null>(null)
   const [wakeStatus, setWakeStatus] = useState<string | null>(null)
   const [botLevel, setBotLevel] = useState<BotLevel>('casual')
+  const [timeControl, setTimeControl] = useState<TimeControlId>(DEFAULT_TIME_CONTROL)
   const [actionError, setActionError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -151,7 +159,14 @@ export function GameLobby({
         className={`lobby-card ${meta.accent} lobby-anim ${delayClass ?? ''}`}
         disabled={busy || !canPlay}
         onClick={() =>
-          run(() => onCreate({ mode, playAs, botLevel: isBot ? botLevel : undefined }))
+          run(() =>
+            onCreate({
+              mode,
+              playAs,
+              botLevel: isBot ? botLevel : undefined,
+              timeControl,
+            }),
+          )
         }
       >
         <span className="lobby-card-icon" aria-hidden>
@@ -259,17 +274,34 @@ export function GameLobby({
         )}
       </div>
 
-      <section className="lobby-section lobby-play-now lobby-anim lobby-anim--delay-3">
-        <h3 className="lobby-section-title">Play now</h3>
-        <div className="lobby-grid">
-          {modeCard('bot', 'bot', 'Play vs Bot', 'Practice against the built-in engine.', 'white', 'lobby-anim--delay-3')}
-          {modeCard('bot-black', 'bot', 'Bot as White', 'You play Black; the bot moves first.', 'black', 'lobby-anim--delay-4')}
-          {modeCard('online', 'online', 'Online Room', 'Create a room and share the invite link.', undefined, 'lobby-anim--delay-5')}
-          {modeCard('local', 'local', 'Hot Seat', 'Two players, one device — both colors.', undefined, 'lobby-anim--delay-6')}
+      <section className="lobby-section lobby-panel lobby-anim lobby-anim--delay-3">
+        <h3 className="lobby-section-title">Time control</h3>
+        <div className="time-control-picker">
+          {TIME_CONTROLS.map((tc) => (
+            <button
+              key={tc.id}
+              type="button"
+              className={timeControl === tc.id ? 'active' : ''}
+              onClick={() => setTimeControl(tc.id)}
+            >
+              <strong>{tc.label}</strong>
+              <span>{tc.detail}</span>
+            </button>
+          ))}
         </div>
       </section>
 
-      <section className="lobby-section lobby-panel lobby-anim lobby-anim--delay-6">
+      <section className="lobby-section lobby-play-now lobby-anim lobby-anim--delay-4">
+        <h3 className="lobby-section-title">Play now</h3>
+        <div className="lobby-grid">
+          {modeCard('bot', 'bot', 'Play vs Bot', 'Practice against the built-in engine.', 'white', 'lobby-anim--delay-4')}
+          {modeCard('bot-black', 'bot', 'Bot as White', 'You play Black; the bot moves first.', 'black', 'lobby-anim--delay-5')}
+          {modeCard('online', 'online', 'Online Room', 'Create a room and share the invite link.', undefined, 'lobby-anim--delay-6')}
+          {modeCard('local', 'local', 'Hot Seat', 'Two players, one device — both colors.', undefined, 'lobby-anim--delay-7')}
+        </div>
+      </section>
+
+      <section className="lobby-section lobby-panel lobby-anim lobby-anim--delay-7">
         <h3 className="lobby-section-title">Bot strength</h3>
         <div className="bot-level-picker">
           {BOT_LEVELS.map((level) => (

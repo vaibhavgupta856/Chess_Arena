@@ -54,13 +54,21 @@ type gameState struct {
 	BotElo         int              `json:"botElo,omitempty"`
 	WhiteEloDelta  int              `json:"whiteEloDelta,omitempty"`
 	BlackEloDelta  int              `json:"blackEloDelta,omitempty"`
+	TimeControl    string           `json:"timeControl,omitempty"`
+	InitialTimeMs  int64            `json:"initialTimeMs"`
+	IncrementMs    int64            `json:"incrementMs"`
+	WhiteTimeMs    int64            `json:"whiteTimeMs"`
+	BlackTimeMs    int64            `json:"blackTimeMs"`
+	ClockRunning   bool             `json:"clockRunning"`
+	ClockUpdatedAt int64            `json:"clockUpdatedAt"`
 }
 
 type createGameRequest struct {
-	Mode     string `json:"mode"`
-	PlayAs   string `json:"playAs"`
-	ClientID string `json:"clientId"`
-	BotLevel string `json:"botLevel"`
+	Mode        string `json:"mode"`
+	PlayAs      string `json:"playAs"`
+	ClientID    string `json:"clientId"`
+	BotLevel    string `json:"botLevel"`
+	TimeControl string `json:"timeControl"`
 }
 
 type joinRequest struct {
@@ -109,11 +117,13 @@ func (s *server) newGameHandler(w http.ResponseWriter, r *http.Request) {
 	if playerID == "" {
 		playerID = s.playerIDForGame(r, req.ClientID)
 	}
-	session := newSession(id, mode, req.PlayAs, playerID, level)
+	session := newSession(id, mode, req.PlayAs, playerID, level, req.TimeControl)
 
 	s.mu.Lock()
 	s.sessions[id] = session
 	s.mu.Unlock()
+
+	s.ensureClockStarted(session)
 
 	if s.botShouldSchedule(session) {
 		s.scheduleBotMove(id)
@@ -185,6 +195,7 @@ func (s *server) joinHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	s.ensureClockStarted(session)
 	s.broadcast(id)
 	state := s.encodeState(session, playerID)
 	state.YourColor = color
@@ -222,6 +233,14 @@ func (s *server) moveHandler(w http.ResponseWriter, r *http.Request) {
 		moverID = req.ClientID
 	}
 
+	mover, clockOK := s.prepareMoveClock(session)
+	if !clockOK {
+		s.applyOnlineRatings(session)
+		s.broadcast(id)
+		writeJSON(w, http.StatusConflict, s.encodeState(session, moverID))
+		return
+	}
+
 	session.mu.Lock()
 	g := session.game
 	var err error
@@ -240,13 +259,21 @@ func (s *server) moveHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
+		// Restore clock after rejected move attempt.
+		session.startClockLocked(time.Now())
+		gen := session.clockGen
+		running := session.clockRunning
 		session.mu.Unlock()
+		if running {
+			s.scheduleClockTimeoutAfter(id, gen)
+		}
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	session.drawOfferBy = chess.NoColor
 	session.mu.Unlock()
 	s.cancelBotMove(session)
+	s.afterMoveClock(session, mover)
 
 	if session.game.IsOver() {
 		s.applyOnlineRatings(session)
@@ -324,6 +351,7 @@ func (s *server) resignHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	session.mu.Lock()
 	session.drawOfferBy = chess.NoColor
+	session.pauseClockLocked(time.Now())
 	session.mu.Unlock()
 	s.cancelBotMove(session)
 	s.applyOnlineRatings(session)
@@ -385,6 +413,10 @@ func (s *server) drawHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if session.game.IsOver() {
+		session.mu.Lock()
+		session.pauseClockLocked(time.Now())
+		session.mu.Unlock()
+		s.cancelBotMove(session)
 		s.applyOnlineRatings(session)
 	}
 	s.broadcast(id)
@@ -423,6 +455,10 @@ func (s *server) drawResponseHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if session.game.IsOver() {
+		session.mu.Lock()
+		session.pauseClockLocked(time.Now())
+		session.mu.Unlock()
+		s.cancelBotMove(session)
 		s.applyOnlineRatings(session)
 	}
 	s.broadcast(id)
@@ -450,11 +486,20 @@ func (s *server) nextID() string {
 }
 
 func (s *server) encodeState(session *gameSession, clientID string) gameState {
+	now := time.Now()
 	session.mu.Lock()
 	botThinking := session.botThinking
 	botLevel := session.botLevel
 	whiteDelta := session.whiteDelta
 	blackDelta := session.blackDelta
+	timeControlID := session.timeControlID
+	initialTimeMs := session.initialTimeMs
+	incrementMs := session.incrementMs
+	whiteTimeMs, blackTimeMs, clockRunning, clockUpdatedAt := session.snapshotTimesLocked(now)
+	whitePlayer := session.whitePlayer
+	blackPlayer := session.blackPlayer
+	mode := session.mode
+	drawOfferBy := session.drawOfferBy
 	session.mu.Unlock()
 
 	g := session.game
@@ -473,15 +518,15 @@ func (s *server) encodeState(session *gameSession, clientID string) gameState {
 		}
 	}
 	waiting := ""
-	if session.mode == "online" {
-		if session.whitePlayer == "" {
+	if mode == "online" {
+		if whitePlayer == "" {
 			waiting = "white"
-		} else if session.blackPlayer == "" {
+		} else if blackPlayer == "" {
 			waiting = "black"
 		}
 	}
 	yourColor := ""
-	if session.mode == "local" {
+	if mode == "local" {
 		yourColor = "both"
 	} else if clientID != "" {
 		switch session.playerColor(clientID) {
@@ -492,8 +537,8 @@ func (s *server) encodeState(session *gameSession, clientID string) gameState {
 		}
 	}
 	drawOffer := ""
-	if session.drawOfferBy != chess.NoColor {
-		drawOffer = session.drawOfferBy.String()
+	if drawOfferBy != chess.NoColor {
+		drawOffer = drawOfferBy.String()
 	}
 	fens := make([]string, 0, g.Ply()+1)
 	for i := 0; i <= g.Ply(); i++ {
@@ -514,10 +559,10 @@ func (s *server) encodeState(session *gameSession, clientID string) gameState {
 		History:        records,
 		PositionFENs:   fens,
 		Ply:            g.Ply(),
-		Mode:           session.mode,
+		Mode:           mode,
 		YourColor:      yourColor,
-		WhitePlayer:    session.whitePlayer,
-		BlackPlayer:    session.blackPlayer,
+		WhitePlayer:    whitePlayer,
+		BlackPlayer:    blackPlayer,
 		WaitingFor:     waiting,
 		DrawOfferBy:    drawOffer,
 		ClaimableDraws: claims,
@@ -526,6 +571,13 @@ func (s *server) encodeState(session *gameSession, clientID string) gameState {
 		BotElo:         botLevel.Elo(),
 		WhiteEloDelta:  whiteDelta,
 		BlackEloDelta:  blackDelta,
+		TimeControl:    timeControlID,
+		InitialTimeMs:  initialTimeMs,
+		IncrementMs:    incrementMs,
+		WhiteTimeMs:    whiteTimeMs,
+		BlackTimeMs:    blackTimeMs,
+		ClockRunning:   clockRunning,
+		ClockUpdatedAt: clockUpdatedAt.UnixMilli(),
 	}
 }
 

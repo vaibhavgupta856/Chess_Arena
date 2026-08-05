@@ -13,6 +13,8 @@ type Props = {
  */
 export function GameStatusOverlays({ game }: Props) {
   const isCheckmate = game.over && game.termination === 'checkmate'
+  const isTimeout = game.over && game.termination === 'timeout'
+  const isTerminalBanner = isCheckmate || isTimeout
   const [tipVisible, setTipVisible] = useState(true)
   const [checkVisible, setCheckVisible] = useState(false)
   const [checkAnimKey, setCheckAnimKey] = useState(0)
@@ -26,7 +28,7 @@ export function GameStatusOverlays({ game }: Props) {
   }, [game.id])
 
   useEffect(() => {
-    if (isCheckmate) {
+    if (isTerminalBanner) {
       setCheckVisible(false)
       prevInCheck.current = true
       prevFen.current = game.fen
@@ -46,15 +48,22 @@ export function GameStatusOverlays({ game }: Props) {
     setCheckAnimKey((k) => k + 1)
     const id = window.setTimeout(() => setCheckVisible(false), 2000)
     return () => window.clearTimeout(id)
-  }, [game.fen, game.inCheck, game.over, isCheckmate])
+  }, [game.fen, game.inCheck, game.over, isTerminalBanner])
 
-  if (!tipVisible && !checkVisible && !isCheckmate) return null
+  if (!tipVisible && !checkVisible && !isTerminalBanner) return null
 
   return (
     <div className="game-banner-overlay" aria-live="polite">
       {isCheckmate ? (
         <div className="game-banner game-banner--checkmate" role="status">
           <span className="game-banner-title">Checkmate</span>
+          {game.outcome && game.outcome !== '*' && (
+            <span className="game-banner-sub">{game.outcome}</span>
+          )}
+        </div>
+      ) : isTimeout ? (
+        <div className="game-banner game-banner--timeout" role="status">
+          <span className="game-banner-title">Timeout</span>
           {game.outcome && game.outcome !== '*' && (
             <span className="game-banner-sub">{game.outcome}</span>
           )}
