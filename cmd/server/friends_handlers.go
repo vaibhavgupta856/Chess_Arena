@@ -87,7 +87,8 @@ func (s *server) friendChallengeHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	var req struct {
-		OpponentID string `json:"opponentId"`
+		OpponentID  string `json:"opponentId"`
+		TimeControl string `json:"timeControl"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.OpponentID == "" {
 		http.Error(w, "opponentId required", http.StatusBadRequest)
@@ -95,7 +96,7 @@ func (s *server) friendChallengeHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	gameID := s.nextID()
-	session := newSession(gameID, "online", "white", userID, "")
+	session := newSession(gameID, "online", "white", userID, "", req.TimeControl)
 	s.mu.Lock()
 	s.sessions[gameID] = session
 	s.mu.Unlock()
@@ -146,6 +147,7 @@ func (s *server) acceptChallengeHandler(w http.ResponseWriter, r *http.Request) 
 	session.blackPlayer = userID
 	session.mu.Unlock()
 	_ = s.store.UpdateChallengeStatus(challengeID, "accepted")
+	s.ensureClockStarted(session)
 	s.broadcast(ch.GameID)
 	state := s.encodeState(session, userID)
 	state.YourColor = "black"

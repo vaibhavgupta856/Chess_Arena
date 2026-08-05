@@ -165,6 +165,7 @@ export function useGame() {
             playAs,
             clientId: hostId,
             botLevel: options.botLevel ?? 'casual',
+            timeControl: options.timeControl ?? '10+0',
           }),
         })
         if (!res.ok) throw new Error(await res.text())

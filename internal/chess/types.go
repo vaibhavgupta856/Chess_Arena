@@ -294,6 +294,7 @@ const (
 	FiftyMoveRule
 	SeventyFiveMoveRule
 	InsufficientMaterial
+	Timeout
 )
 
 func (t Termination) String() string {
@@ -316,6 +317,8 @@ func (t Termination) String() string {
 		return "seventy_five_move_rule"
 	case InsufficientMaterial:
 		return "insufficient_material"
+	case Timeout:
+		return "timeout"
 	default:
 		return "none"
 	}

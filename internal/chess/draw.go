@@ -60,3 +60,20 @@ func (g *Game) Resign(color Color) error {
 	g.term = Resignation
 	return nil
 }
+
+// Flag ends the game when color runs out of time.
+func (g *Game) Flag(color Color) error {
+	if g.IsOver() {
+		return fmt.Errorf("chess: game is already over")
+	}
+	if color == NoColor {
+		return fmt.Errorf("chess: invalid color")
+	}
+	if color == White {
+		g.outcome = BlackWins
+	} else {
+		g.outcome = WhiteWins
+	}
+	g.term = Timeout
+	return nil
+}

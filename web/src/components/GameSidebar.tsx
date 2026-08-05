@@ -1,4 +1,5 @@
 import { CoachPanel } from './CoachPanel'
+import { GameClocks } from './GameClocks'
 import type { GameState } from '../types'
 import { canPlayerMove } from '../hooks/useGame'
 
@@ -29,6 +30,9 @@ function formatOutcome(game: GameState) {
     return `${game.turn} to move`
   }
   if (game.termination && game.termination !== 'none') {
+    if (game.termination === 'timeout') {
+      return `${game.outcome} (timeout)`
+    }
     return `${game.outcome} (${game.termination.replaceAll('_', ' ')})`
   }
   return game.outcome
@@ -100,6 +104,7 @@ export function GameSidebar({
       <div className="sidebar-section">
         <h3>Game</h3>
         <p className="sidebar-status">{formatOutcome(game)}</p>
+        <GameClocks game={game} />
         {game.over && game.mode === 'online' && (game.whiteEloDelta || game.blackEloDelta) ? (
           <p className="lobby-hint">
             Rating: White {formatDelta(game.whiteEloDelta)} · Black {formatDelta(game.blackEloDelta)}

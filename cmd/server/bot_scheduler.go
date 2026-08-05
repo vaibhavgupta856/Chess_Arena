@@ -2,6 +2,8 @@ package main
 
 import (
 	"time"
+
+	"github.com/conan/chessarena/internal/chess"
 )
 
 const botMoveDelay = 700 * time.Millisecond
@@ -46,10 +48,38 @@ func (s *server) scheduleBotMove(gameID string) {
 			s.broadcast(gameID)
 			return
 		}
-		_ = session.maybeBotMove()
+		mover := session.game.Turn()
+		if session.clocksEnabled() && session.seatsReady() {
+			if !session.debitActiveClockLocked(time.Now()) {
+				_ = session.flagActiveLocked()
+				session.botThinking = false
+				session.drawOfferBy = chess.NoColor
+				session.mu.Unlock()
+				s.mu.Unlock()
+				s.applyOnlineRatings(session)
+				s.broadcast(gameID)
+				return
+			}
+		}
+		err := session.maybeBotMove()
 		session.botThinking = false
+		if err == nil && !session.game.IsOver() {
+			session.addIncrementLocked(mover)
+			session.startClockLocked(time.Now())
+		} else if session.game.IsOver() {
+			session.pauseClockLocked(time.Now())
+		}
+		genClock := session.clockGen
+		running := session.clockRunning
+		over := session.game.IsOver()
 		session.mu.Unlock()
 		s.mu.Unlock()
+
+		if over {
+			s.applyOnlineRatings(session)
+		} else if running {
+			s.scheduleClockTimeoutAfter(gameID, genClock)
+		}
 		s.broadcast(gameID)
 	}()
 }

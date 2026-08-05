@@ -1,4 +1,5 @@
 import type { GameState } from '../types'
+import { GameClocks } from './GameClocks'
 
 type Props = {
   game: GameState
@@ -12,7 +13,10 @@ type Props = {
 function shortStatus(game: GameState, atLive: boolean, viewPly: number) {
   if (!atLive) return `Move ${viewPly}`
   if (game.botThinking) return 'Bot thinking…'
-  if (game.over) return game.outcome
+  if (game.over) {
+    if (game.termination === 'timeout') return `Timeout · ${game.outcome}`
+    return game.outcome
+  }
   if (game.waitingFor) return `Waiting for ${game.waitingFor}`
   if (game.inCheck) return `${game.turn} — check!`
   return `${game.turn} to move`
@@ -32,9 +36,7 @@ export function MobileGameBar({
     <div className="mobile-game-bar">
       <div className="mobile-game-bar-status">
         <span className="mobile-game-bar-turn">{shortStatus(game, atLivePosition, viewPly)}</span>
-        <span className="mobile-game-bar-meta">
-          {game.mode ?? 'local'} · you: {game.yourColor || '—'}
-        </span>
+        <GameClocks game={game} compact />
       </div>
       <div className="mobile-game-bar-actions">
         <button
