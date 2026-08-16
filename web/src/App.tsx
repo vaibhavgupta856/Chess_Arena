@@ -100,8 +100,14 @@ function App() {
     if (tourAutoStart) setTourOpen(true)
   }, [tourAutoStart])
 
+  // Rooms always open in 3D. Manual 2D during a game is unchanged.
+  useEffect(() => {
+    if (screen === 'game') setView('3d')
+  }, [screen])
+
   const joinFromSocial = useCallback(
     (g: GameState, asHost = false) => {
+      setView('3d')
       enterGame(g, seatForGame(g, clientId), true, asHost)
       setLobbyView('play')
     },
@@ -166,6 +172,7 @@ function App() {
           setTourAutoRotate(false)
           break
         case 'openSidebar':
+          setView('3d')
           setTourAutoRotate(false)
           setTourShowCamera(false)
           setSidebarOpen(true)
@@ -185,6 +192,7 @@ function App() {
     setTourAutoStart(false)
     setTourAutoRotate(false)
     setTourShowCamera(false)
+    setView('3d')
     setTourIndex(0)
   }, [setTourAutoStart])
 
