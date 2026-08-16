@@ -18,6 +18,7 @@ type Props = {
   onOpenProfile: () => void
   onOpenFriends: () => void
   onOpenLeaderboard: () => void
+  onStartTutorial?: () => void
 }
 
 const MODE_META: Record<string, { icon: string; accent: string }> = {
@@ -54,6 +55,7 @@ export function GameLobby({
   onOpenProfile,
   onOpenFriends,
   onOpenLeaderboard,
+  onStartTutorial,
 }: Props) {
   const [joinId, setJoinId] = useState('')
   const [busy, setBusy] = useState(false)
@@ -204,7 +206,7 @@ export function GameLobby({
         </section>
       )}
 
-      <nav className="lobby-nav lobby-panel lobby-anim lobby-anim--delay-1">
+      <nav className="lobby-nav lobby-panel lobby-anim lobby-anim--delay-1" data-tour="nav">
         {user ? (
           <>
             <span className="lobby-user-pill">
@@ -222,6 +224,11 @@ export function GameLobby({
               <button type="button" className="sidebar-btn" onClick={onOpenLeaderboard}>
                 Leaderboard
               </button>
+              {onStartTutorial && (
+                <button type="button" className="sidebar-btn" onClick={onStartTutorial}>
+                  Tutorial
+                </button>
+              )}
             </div>
           </>
         ) : (
@@ -232,6 +239,11 @@ export function GameLobby({
             <button type="button" className="sidebar-btn" onClick={onOpenLeaderboard}>
               Leaderboard
             </button>
+            {onStartTutorial && (
+              <button type="button" className="sidebar-btn" onClick={onStartTutorial}>
+                Tutorial
+              </button>
+            )}
           </div>
         )}
       </nav>
@@ -259,7 +271,7 @@ export function GameLobby({
         )}
       </div>
 
-      <section className="lobby-section lobby-play-now lobby-anim lobby-anim--delay-3">
+      <section className="lobby-section lobby-play-now lobby-anim lobby-anim--delay-3" data-tour="play">
         <h3 className="lobby-section-title">Play now</h3>
         <div className="lobby-grid">
           {modeCard('bot', 'bot', 'Play vs Bot', 'Practice against the built-in engine.', 'white', 'lobby-anim--delay-3')}
@@ -269,7 +281,7 @@ export function GameLobby({
         </div>
       </section>
 
-      <section className="lobby-section lobby-panel lobby-anim lobby-anim--delay-6">
+      <section className="lobby-section lobby-panel lobby-anim lobby-anim--delay-6" data-tour="bot-level">
         <h3 className="lobby-section-title">Bot strength</h3>
         <div className="bot-level-picker">
           {BOT_LEVELS.map((level) => (
@@ -286,7 +298,7 @@ export function GameLobby({
         </div>
       </section>
 
-      <section className="lobby-join lobby-panel lobby-anim lobby-anim--delay-7">
+      <section className="lobby-join lobby-panel lobby-anim lobby-anim--delay-7" data-tour="join">
         <h3>Join a room</h3>
         <div className="lobby-join-row">
           <input

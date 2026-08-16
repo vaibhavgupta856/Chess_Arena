@@ -31,6 +31,10 @@ type Props = {
   canMove: boolean
   onMove: (uci: string) => void
   hideCameraUi?: boolean
+  /** Product-tour: gentle board orbit */
+  tourAutoRotate?: boolean
+  /** Product-tour: force camera panel open on mobile */
+  tourShowCamera?: boolean
 }
 
 function rebuildSquareMap(pieces: Map<string, PieceVisual> | PieceVisual[]) {
@@ -259,7 +263,13 @@ function Scene({
   cameraMode,
   cameraAngle,
   theme,
-}: Props & { cameraMode: CameraMode; cameraAngle: CameraAngleId; theme: BoardTheme }) {
+  tourAutoRotate = false,
+}: Props & {
+  cameraMode: CameraMode
+  cameraAngle: CameraAngleId
+  theme: BoardTheme
+  tourAutoRotate?: boolean
+}) {
   const { camera, gl } = useThree()
   const [selected, setSelected] = useState<string | null>(null)
   const [hovered, setHovered] = useState<string | null>(null)
@@ -807,7 +817,8 @@ function Scene({
       <BoardCameraControls
         cameraMode={cameraMode}
         cameraAngle={cameraAngle}
-        orbitEnabled={orbitEnabled}
+        orbitEnabled={orbitEnabled && !tourAutoRotate}
+        autoRotate={tourAutoRotate}
       />
     </>
   )
@@ -834,6 +845,8 @@ export function ChessBoard3D({
   canMove,
   onMove,
   hideCameraUi = false,
+  tourAutoRotate = false,
+  tourShowCamera = false,
 }: Props) {
   const { theme } = useTheme()
   const narrow = useNarrowScreen()
@@ -844,18 +857,24 @@ export function ChessBoard3D({
   )
 
   useEffect(() => {
+    if (tourShowCamera || tourAutoRotate) {
+      setCameraMode('free')
+      setCamOpen(true)
+      return
+    }
     if (!narrow) setCamOpen(true)
     else setCamOpen(false)
-  }, [narrow])
+  }, [narrow, tourShowCamera, tourAutoRotate])
 
   return (
-    <div className="board-3d">
+    <div className="board-3d" data-tour="board">
       {!hideCameraUi && (
         <div className="board-3d-ui">
           {!camOpen ? (
             <button
               type="button"
               className="camera-controls-fab"
+              data-tour="camera"
               aria-expanded={false}
               aria-label="Open camera options"
               onClick={() => setCamOpen(true)}
@@ -863,7 +882,10 @@ export function ChessBoard3D({
               Cam
             </button>
           ) : (
-            <div className={`camera-controls${narrow ? ' camera-controls--compact' : ''}`}>
+            <div
+              className={`camera-controls${narrow ? ' camera-controls--compact' : ''}`}
+              data-tour="camera"
+            >
               <div className="camera-controls-row">
                 <span className="camera-controls-label">Camera</span>
                 {narrow && (
@@ -936,6 +958,7 @@ export function ChessBoard3D({
             cameraMode={cameraMode}
             cameraAngle={cameraAngle}
             theme={theme}
+            tourAutoRotate={tourAutoRotate}
           />
         </Suspense>
       </Canvas>

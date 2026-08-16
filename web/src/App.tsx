@@ -3,17 +3,16 @@ import './App.css'
 import { useCallback, useEffect, useState } from 'react'
 
 import { ChessBoard2D } from './components/ChessBoard2D'
-
 import { ChessBoard3D } from './components/ChessBoard3D'
-
 import { GameLobby } from './components/GameLobby'
-
 import { GameSidebar } from './components/GameSidebar'
 import { MobileGameBar } from './components/MobileGameBar'
 import { ThemePicker } from './components/ThemePicker'
 import { GameStatusOverlays } from './components/GameStatusOverlays'
+import { ProductTour, useShouldAutoStartTour } from './components/ProductTour'
 import { useTheme } from './hooks/useTheme'
 import { getLobbyUiColors, getRoomAtmosphere } from './lib/themes'
+import type { TourAction } from './lib/tutorial'
 
 import { canPlayerMove, useGame } from './hooks/useGame'
 import { useAuth } from './hooks/useAuth'
@@ -73,10 +72,15 @@ function App() {
   const [view, setView] = useState<ViewMode>('3d')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [lobbyView, setLobbyView] = useState<LobbyView>('play')
+  const [tourAutoStart, setTourAutoStart] = useShouldAutoStartTour()
+  const [tourOpen, setTourOpen] = useState(false)
+  const [tourIndex, setTourIndex] = useState(0)
+  const [tourAutoRotate, setTourAutoRotate] = useState(false)
+  const [tourShowCamera, setTourShowCamera] = useState(false)
 
   const is3d = view === '3d' && screen === 'game'
-
   const canMove = game ? canPlayerMove(game, atLivePosition) : false
+  const tourActive = tourOpen || tourAutoStart
 
   useEffect(() => {
     if (!user || screen !== 'lobby') return
@@ -87,12 +91,90 @@ function App() {
     return () => window.clearInterval(id)
   }, [user, screen, loadFriends])
 
+  useEffect(() => {
+    if (tourAutoStart) setTourOpen(true)
+  }, [tourAutoStart])
+
   const joinFromSocial = useCallback(
     (g: GameState, asHost = false) => {
       enterGame(g, seatForGame(g, clientId), true, asHost)
       setLobbyView('play')
     },
     [clientId, enterGame],
+  )
+
+  const handleTourAction = useCallback(
+    async (action: TourAction) => {
+      switch (action) {
+        case 'ensureLobbyPlay':
+          setLobbyView('play')
+          setSidebarOpen(false)
+          setTourAutoRotate(false)
+          setTourShowCamera(false)
+          if (screen === 'game') leaveToLobby()
+          break
+        case 'startDemoGame':
+          setLobbyView('play')
+          setView('3d')
+          setSidebarOpen(false)
+          setTourShowCamera(false)
+          await createGame({ mode: 'bot', playAs: 'white', botLevel: 'beginner' })
+          break
+        case 'ensure3d':
+          setView('3d')
+          break
+        case 'openCamera':
+          setView('3d')
+          setTourShowCamera(true)
+          setSidebarOpen(false)
+          break
+        case 'autoRotateOn':
+          setView('3d')
+          setTourAutoRotate(true)
+          setTourShowCamera(false)
+          setSidebarOpen(false)
+          break
+        case 'autoRotateOff':
+          setTourAutoRotate(false)
+          break
+        case 'openSidebar':
+          setTourAutoRotate(false)
+          setTourShowCamera(false)
+          setSidebarOpen(true)
+          break
+        case 'closeSidebar':
+          setSidebarOpen(false)
+          break
+        default:
+          break
+      }
+    },
+    [createGame, leaveToLobby, screen],
+  )
+
+  const closeTour = useCallback(() => {
+    setTourOpen(false)
+    setTourAutoStart(false)
+    setTourAutoRotate(false)
+    setTourShowCamera(false)
+    setTourIndex(0)
+  }, [setTourAutoStart])
+
+  const startTour = useCallback(() => {
+    setLobbyView('play')
+    setTourIndex(0)
+    setTourOpen(true)
+  }, [])
+
+  const tour = (
+    <ProductTour
+      active={tourActive}
+      screen={screen}
+      index={tourIndex}
+      onIndexChange={setTourIndex}
+      onClose={closeTour}
+      onAction={handleTourAction}
+    />
   )
 
   if (screen === 'lobby') {
@@ -116,7 +198,7 @@ function App() {
       >
         <div className="lobby-bg-decor" aria-hidden />
         <header className="app-header lobby-header">
-          <div className="lobby-brand">
+          <div className="lobby-brand" data-tour="brand">
             <span className="lobby-logo" aria-hidden>
               ♔
             </span>
@@ -160,17 +242,16 @@ function App() {
               onOpenProfile={() => setLobbyView('profile')}
               onOpenFriends={() => setLobbyView('friends')}
               onOpenLeaderboard={() => setLobbyView('leaderboard')}
+              onStartTutorial={startTour}
             />
           )}
         </main>
+        {tour}
       </div>
     )
   }
 
-
-
   return (
-
     <div
       className={`app app--game${is3d ? ' app--fullscreen' : ''}`}
       style={{
@@ -183,80 +264,42 @@ function App() {
       <div className="room-bg-decor" aria-hidden />
 
       <header className="app-header">
-
         <h1>ChessArena</h1>
-
         <p>
-
           {game
-
             ? game.over
-
               ? `Game over — ${game.outcome}`
-
               : !atLivePosition
-
                 ? `Reviewing move ${viewPly}`
-
                 : game.botThinking
                   ? 'Bot is thinking…'
                   : game.waitingFor === 'black' && game.yourColor === 'white'
-                  ? 'You are White — share invite link for opponent'
-                  : game.waitingFor
-                    ? `Waiting for opponent (${game.waitingFor})…`
-
-                  : `${game.turn} to move${game.inCheck ? ' — check!' : ''}`
-
+                    ? 'You are White — share invite link for opponent'
+                    : game.waitingFor
+                      ? `Waiting for opponent (${game.waitingFor})…`
+                      : `${game.turn} to move${game.inCheck ? ' — check!' : ''}`
             : 'Loading…'}
-
         </p>
 
-        <div className="view-toggle">
+        <div className="view-toggle" data-tour="view-toggle">
           <ThemePicker />
-          <button
-
-            type="button"
-
-            className={view === '2d' ? 'active' : ''}
-
-            onClick={() => setView('2d')}
-
-          >
-
+          <button type="button" className={view === '2d' ? 'active' : ''} onClick={() => setView('2d')}>
             2D
-
           </button>
-
-          <button
-
-            type="button"
-
-            className={view === '3d' ? 'active' : ''}
-
-            onClick={() => setView('3d')}
-
-          >
-
+          <button type="button" className={view === '3d' ? 'active' : ''} onClick={() => setView('3d')}>
             3D
-
           </button>
-
         </div>
 
         {error && <p className="error">{error}</p>}
-
       </header>
 
       <main className={`game-layout${is3d ? ' game-layout--fullscreen' : ''}`}>
-
         {game && (
-
           <>
-
             <div className={`board-container${is3d ? ' board-container--fullscreen' : ''}`}>
-
               {view === '2d' && (
-                <div className="board-view board-view--2d">
+                <div className="board-view board-view--2d" data-tour="board">
                   <ChessBoard2D
                     game={game}
                     displayFen={displayFen}
@@ -272,15 +315,16 @@ function App() {
                     game={game}
                     displayFen={displayFen}
                     atLivePosition={atLivePosition}
-                    canMove={canMove}
+                    canMove={canMove && !tourActive}
                     onMove={submitMove}
-                    hideCameraUi={sidebarOpen}
+                    hideCameraUi={sidebarOpen && !tourShowCamera}
+                    tourAutoRotate={tourAutoRotate}
+                    tourShowCamera={tourShowCamera}
                   />
                 </div>
               )}
 
-              <GameStatusOverlays game={game} />
-
+              {!tourActive && <GameStatusOverlays game={game} />}
             </div>
 
             <button
@@ -291,33 +335,19 @@ function App() {
             />
 
             <GameSidebar
-
               game={game}
-
               inviteLink={inviteLink}
-
               viewPly={viewPly}
-
               atLivePosition={atLivePosition}
-
               onUndo={undoView}
-
               onRedo={redoView}
-
               onResign={resign}
-
               onOfferDraw={offerDraw}
-
               onRespondDraw={respondDraw}
-
               onClaimDraw={claimDraw}
-
               onLeave={leaveToLobby}
-
               open={sidebarOpen}
-
               onClose={() => setSidebarOpen(false)}
-
             />
 
             <MobileGameBar
@@ -328,20 +358,12 @@ function App() {
               onRedo={redoView}
               onOpenMenu={() => setSidebarOpen(true)}
             />
-
           </>
-
         )}
-
       </main>
-
+      {tour}
     </div>
-
   )
-
 }
 
-
-
 export default App
-

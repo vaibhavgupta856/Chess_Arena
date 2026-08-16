@@ -29,7 +29,7 @@ export function MobileGameBar({
   const maxPly = game.ply ?? (game.positionFens?.length ?? 1) - 1
 
   return (
-    <div className="mobile-game-bar">
+    <div className="mobile-game-bar" data-tour="mobile-bar">
       <div className="mobile-game-bar-status">
         <span className="mobile-game-bar-turn">{shortStatus(game, atLivePosition, viewPly)}</span>
         <span className="mobile-game-bar-meta">
