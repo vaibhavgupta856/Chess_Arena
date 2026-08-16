@@ -155,7 +155,7 @@ export function GameSidebar({
       </div>
 
       {inviteLink && (
-        <div className="sidebar-section">
+        <div className="sidebar-section" data-tour="sidebar-invite">
           <h3>Invite friend</h3>
           <p className="lobby-hint">Send this link — they join as black on their device.</p>
           <button type="button" className="sidebar-btn" onClick={copyInvite}>
@@ -246,7 +246,7 @@ export function GameSidebar({
         </div>
       )}
 
-      <div className="sidebar-section sidebar-moves">
+      <div className="sidebar-section sidebar-moves" data-tour="sidebar-moves">
         <h3>Moves</h3>
         {lastMove && (
           <p className="last-move">
@@ -268,7 +268,7 @@ export function GameSidebar({
         )}
       </div>
 
-      <button type="button" className="sidebar-btn muted leave-btn" onClick={onLeave}>
+      <button type="button" className="sidebar-btn muted leave-btn" data-tour="sidebar-leave" onClick={onLeave}>
         Back to lobby
       </button>
     </aside>

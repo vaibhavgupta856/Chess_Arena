@@ -146,9 +146,29 @@ export function ProductTour({
         }, 8000)
         if (enterGen.current !== gen) return
         if (!ok && step.target) {
+          if (step.optional) {
+            if (index < steps.length - 1) onIndexChange(index + 1)
+            else onClose()
+            return
+          }
           setLoadError('Lobby UI is still loading. Tap Retry.')
           setBusy(false)
           return
+        }
+      }
+
+      if (step.target && step.target !== 'board') {
+        const found = await waitFor(() => {
+          if (enterGen.current !== gen) return true
+          return Boolean(document.querySelector(`[data-tour="${step.target}"]`))
+        }, step.optional ? 1600 : 8000)
+        if (enterGen.current !== gen) return
+        if (!found) {
+          if (step.optional) {
+            if (index < steps.length - 1) onIndexChange(index + 1)
+            else onClose()
+            return
+          }
         }
       }
 
@@ -163,7 +183,7 @@ export function ProductTour({
     } finally {
       if (enterGen.current === gen) setBusy(false)
     }
-  }, [active, step, onAction, syncRect])
+  }, [active, step, onAction, syncRect, index, steps.length, onIndexChange, onClose])
 
   useEffect(() => {
     void runEnter()
@@ -306,7 +326,7 @@ export function ProductTour({
       />
       {highlight && ready && (
         <div
-          className="product-tour-spotlight"
+          className="product-tour-spotlight product-tour-spotlight--live"
           style={{
             top: highlight.top,
             left: highlight.left,
@@ -318,9 +338,16 @@ export function ProductTour({
 
       <div
         ref={cardRef}
+        key={step.id}
         className={`product-tour-card${dockBottom ? ' product-tour-card--docked' : ''}${narrow ? ' product-tour-card--mobile' : ''}`}
         style={cardStyle}
       >
+        <div className="product-tour-track" aria-hidden>
+          <div
+            className="product-tour-track-fill"
+            style={{ width: `${((index + 1) / Math.max(1, steps.length)) * 100}%` }}
+          />
+        </div>
         <div className="product-tour-progress">
           {index + 1} / {steps.length}
         </div>
@@ -369,15 +396,11 @@ export function ProductTour({
   )
 }
 
+/** Always kick off the tour shortly after the site opens. */
 export function useShouldAutoStartTour() {
   const [should, setShould] = useState(false)
   useEffect(() => {
-    try {
-      if (localStorage.getItem('chessarena-tutorial-v2') === '1') return
-    } catch {
-      // ignore
-    }
-    const id = window.setTimeout(() => setShould(true), 500)
+    const id = window.setTimeout(() => setShould(true), 280)
     return () => window.clearTimeout(id)
   }, [])
   return [should, setShould] as const

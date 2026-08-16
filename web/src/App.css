@@ -2116,11 +2116,34 @@
   border-radius: 14px;
   box-shadow:
     0 0 0 9999px rgba(4, 8, 14, 0.62),
-    0 0 0 2px rgba(255, 255, 255, 0.55),
+    0 0 0 2px rgba(196, 181, 253, 0.85),
+    0 0 28px rgba(168, 85, 247, 0.45),
     0 12px 40px rgba(0, 0, 0, 0.35);
   pointer-events: none;
-  transition: top 0.2s ease, left 0.2s ease, width 0.2s ease, height 0.2s ease;
+  transition: top 0.28s ease, left 0.28s ease, width 0.28s ease, height 0.28s ease;
   z-index: 1;
+}
+
+.product-tour-spotlight--live {
+  animation: tour-spotlight-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes tour-spotlight-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 9999px rgba(4, 8, 14, 0.62),
+      0 0 0 2px rgba(196, 181, 253, 0.75),
+      0 0 22px rgba(168, 85, 247, 0.35),
+      0 12px 40px rgba(0, 0, 0, 0.35);
+  }
+  50% {
+    box-shadow:
+      0 0 0 9999px rgba(4, 8, 14, 0.58),
+      0 0 0 3px rgba(255, 255, 255, 0.95),
+      0 0 36px rgba(168, 85, 247, 0.55),
+      0 12px 40px rgba(0, 0, 0, 0.35);
+  }
 }
 
 .product-tour-card {
@@ -2129,15 +2152,45 @@
   pointer-events: auto;
   padding: 1rem 1.1rem 0.95rem;
   border-radius: 16px;
-  background: #0b1220;
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: linear-gradient(180deg, #121a2c 0%, #0b1220 100%);
+  border: 1px solid rgba(196, 181, 253, 0.28);
   color: #f8fafc;
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(168, 85, 247, 0.12),
+    0 0 40px rgba(124, 58, 237, 0.18);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   overflow-x: hidden;
   overflow-y: auto;
   box-sizing: border-box;
+  animation: tour-card-in 0.28s ease;
+}
+
+@keyframes tour-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.product-tour-track {
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 0 0 0.7rem;
+  overflow: hidden;
+}
+
+.product-tour-track-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #c084fc, #818cf8);
+  transition: width 0.35s ease;
 }
 
 /* Beat lobby/theme heading colors that would make text invisible on the dark card */
@@ -2251,7 +2304,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .product-tour-spotlight {
+  .product-tour-spotlight,
+  .product-tour-spotlight--live,
+  .product-tour-card,
+  .product-tour-track-fill {
+    animation: none;
     transition: none;
   }
 }

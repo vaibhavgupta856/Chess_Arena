@@ -73,7 +73,7 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [lobbyView, setLobbyView] = useState<LobbyView>('play')
   const [tourAutoStart, setTourAutoStart] = useShouldAutoStartTour()
-  const [tourOpen, setTourOpen] = useState(false)
+  const [tourOpen, setTourOpen] = useState(true)
   const [tourIndex, setTourIndex] = useState(0)
   const [tourAutoRotate, setTourAutoRotate] = useState(false)
   const [tourShowCamera, setTourShowCamera] = useState(false)
