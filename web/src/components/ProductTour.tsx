@@ -308,6 +308,7 @@ export function ProductTour({
   const enterGen = useRef(0)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const playingIdRef = useRef<string | null>(null)
+  const voiceStartedAtRef = useRef(0)
   const onActionRef = useRef(onAction)
   const onIndexChangeRef = useRef(onIndexChange)
   const onCloseRef = useRef(onClose)
@@ -327,13 +328,17 @@ export function ProductTour({
   const playVoice = useCallback((id: string) => {
     const el = audioRef.current
     if (!el) return
-    if (playingIdRef.current === id && !el.paused && !el.ended) return
+    if (playingIdRef.current === id && !el.paused && !el.ended && voiceStartedAtRef.current) return
     el.pause()
+    el.removeAttribute('src')
+    el.load()
     el.src = tourVoiceUrl(id)
-    el.currentTime = 0
     playingIdRef.current = id
-    void el.play().catch(() => {
-      playingIdRef.current = null
+    voiceStartedAtRef.current = 0
+    void el.play().then(() => {
+      if (playingIdRef.current === id) voiceStartedAtRef.current = performance.now()
+    }).catch(() => {
+      if (playingIdRef.current === id) playingIdRef.current = null
     })
   }, [])
 
@@ -547,6 +552,10 @@ export function ProductTour({
   stepsLenRef.current = steps.length
 
   useEffect(() => {
+    voiceStartedAtRef.current = 0
+  }, [stepId])
+
+  useEffect(() => {
     if (!active || !tourStarted || voiceMuted || !ready || !step || loadError) return
     playVoice(step.id)
   }, [active, tourStarted, voiceMuted, ready, stepId, loadError, playVoice, step])
@@ -561,10 +570,15 @@ export function ProductTour({
     const expectedId = stepId
 
     const clipFinished = () => {
+      if (playingIdRef.current !== expectedId) return false
+      const started = voiceStartedAtRef.current
+      if (!started) return false
+      const elapsed = (performance.now() - started) / 1000
       const dur = audio.duration
       if (!Number.isFinite(dur) || dur < 0.8) return false
-      if (playingIdRef.current !== expectedId) return false
-      return audio.ended && audio.currentTime >= dur * 0.8
+      // Ignore leftover "ended" from the previous clip when this one just started.
+      if (elapsed < dur * 0.72) return false
+      return audio.ended || audio.currentTime >= dur * 0.85
     }
 
     const go = () => {

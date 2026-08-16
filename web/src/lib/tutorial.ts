@@ -133,7 +133,6 @@ export const TOUR_STEPS: TourStep[] = [
     target: 'sidebar-invite',
     placement: 'right',
     screen: 'game',
-    optional: true,
     enter: ['ensure3d', 'openSidebar'],
   },
   {
