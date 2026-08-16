@@ -472,6 +472,7 @@ export function ProductTour({
     playingIdRef.current = null
     setTourStarted(false)
     markTutorialSeen()
+    void onAction('stopThemeCycle')
     void onAction('autoRotateOff')
     void onAction('closeSidebar')
     onClose()

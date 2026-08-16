@@ -10,7 +10,7 @@ import {
 type ThemeContextValue = {
   theme: BoardTheme
   themeId: string
-  setThemeId: (id: string) => void
+  setThemeId: (id: string, opts?: { persist?: boolean }) => void
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null)
@@ -18,8 +18,8 @@ const ThemeContext = createContext<ThemeContextValue | null>(null)
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [themeId, setThemeIdState] = useState(getStoredThemeId)
 
-  const setThemeId = (id: string) => {
-    setStoredThemeId(id)
+  const setThemeId = (id: string, opts?: { persist?: boolean }) => {
+    if (opts?.persist !== false) setStoredThemeId(id)
     setThemeIdState(id)
   }
 

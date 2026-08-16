@@ -13,6 +13,8 @@ export type TourAction =
   | 'autoRotateOff'
   | 'openSidebar'
   | 'closeSidebar'
+  | 'cycleThemes'
+  | 'stopThemeCycle'
 
 export type TourStep = {
   id: string
@@ -173,11 +175,11 @@ export const TOUR_STEPS: TourStep[] = [
   {
     id: 'theme',
     title: 'Themes',
-    body: 'Swap board and room looks. Your pick is saved for next time.',
+    body: 'Watch the room swap looks. Tap a circle anytime — your pick is saved.',
     target: 'theme',
     placement: 'bottom',
     screen: 'lobby',
-    enter: ['ensureLobbyPlay'],
+    enter: ['ensureLobbyPlay', 'cycleThemes'],
   },
   {
     id: 'nav',
@@ -186,7 +188,7 @@ export const TOUR_STEPS: TourStep[] = [
     target: 'nav',
     placement: 'bottom',
     screen: 'lobby',
-    enter: ['ensureLobbyPlay'],
+    enter: ['stopThemeCycle', 'ensureLobbyPlay'],
   },
   {
     id: 'play',
