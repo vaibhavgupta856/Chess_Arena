@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import {
   filterTourSteps,
   isNarrowTourViewport,
@@ -204,6 +204,32 @@ export function ProductTour({
     return () => window.clearTimeout(id)
   }, [active, step?.autoAdvanceMs, step?.id, ready, busy, loadError, index, steps.length, finish, onIndexChange])
 
+  const bodyText = loadError
+    ? loadError
+    : busy && !ready
+      ? step?.screen === 'game'
+        ? 'Opening your 3D practice room… (server may take a moment to wake)'
+        : 'Loading…'
+      : (step?.body ?? '')
+
+  const cardRef = useRef<HTMLDivElement>(null)
+  const [cardHeight, setCardHeight] = useState(200)
+
+  useLayoutEffect(() => {
+    if (!active) return
+    const el = cardRef.current
+    if (!el) return
+    const measure = () => setCardHeight(el.getBoundingClientRect().height)
+    measure()
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null
+    ro?.observe(el)
+    window.addEventListener('resize', measure)
+    return () => {
+      ro?.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [active, index, bodyText, narrow, step?.id])
+
   if (!active || !step) return null
 
   const pad = 10
@@ -217,17 +243,17 @@ export function ProductTour({
         }
       : null
 
-  const cardWidth = narrow ? Math.min(window.innerWidth - 24, 360) : 380
+  const edge = 12
+  // Prefer env(safe-area) via CSS for docked cards; JS clamp uses a generous bottom inset.
+  const bottomInset = Math.max(edge, narrow ? 16 : 12) + (narrow ? 8 : 0)
+  const cardWidth = narrow ? Math.min(window.innerWidth - edge * 2, 400) : 380
   const dim = step.dim ?? 'full'
+  const dockBottom = Boolean(step.hideSpotlight || step.placement === 'center' || narrow)
 
-  let cardTop = window.innerHeight / 2 - 90
+  let cardTop = window.innerHeight / 2 - cardHeight / 2
   let cardLeft = window.innerWidth / 2 - cardWidth / 2
 
-  // Dock the 3D showcase card near the bottom so the room stays visible.
-  if (step.hideSpotlight || step.placement === 'center') {
-    cardTop = narrow ? window.innerHeight - 210 : window.innerHeight - 200
-    cardLeft = window.innerWidth / 2 - cardWidth / 2
-  } else if (highlight) {
+  if (!dockBottom && highlight) {
     const gap = 14
     switch (step.placement) {
       case 'bottom':
@@ -235,15 +261,15 @@ export function ProductTour({
         cardLeft = highlight.left + highlight.width / 2 - cardWidth / 2
         break
       case 'top':
-        cardTop = highlight.top - gap - 150
+        cardTop = highlight.top - gap - cardHeight
         cardLeft = highlight.left + highlight.width / 2 - cardWidth / 2
         break
       case 'left':
-        cardTop = highlight.top + highlight.height / 2 - 80
+        cardTop = highlight.top + highlight.height / 2 - cardHeight / 2
         cardLeft = highlight.left - gap - cardWidth
         break
       case 'right':
-        cardTop = highlight.top + highlight.height / 2 - 80
+        cardTop = highlight.top + highlight.height / 2 - cardHeight / 2
         cardLeft = highlight.left + highlight.width + gap
         break
       default:
@@ -251,18 +277,26 @@ export function ProductTour({
     }
   }
 
-  cardTop = clamp(cardTop, 12, window.innerHeight - (narrow ? 200 : 180))
-  cardLeft = clamp(cardLeft, 12, window.innerWidth - cardWidth - 12)
-
-  const bodyText = loadError
-    ? loadError
-    : busy && !ready
-      ? step.screen === 'game'
-        ? 'Opening your 3D practice room… (server may take a moment to wake)'
-        : 'Loading…'
-      : step.body
+  const maxTop = Math.max(edge, window.innerHeight - cardHeight - bottomInset)
+  cardTop = clamp(cardTop, edge, maxTop)
+  cardLeft = clamp(cardLeft, edge, Math.max(edge, window.innerWidth - cardWidth - edge))
 
   const nextDisabled = busy || Boolean(loadError) || (!ready && Boolean(step.enter?.length || step.screen === 'game'))
+
+  const cardStyle: CSSProperties = dockBottom
+    ? {
+        top: 'auto',
+        bottom: `max(${bottomInset}px, env(safe-area-inset-bottom, 0px))`,
+        left: narrow ? edge : cardLeft,
+        width: narrow ? `calc(100% - ${edge * 2}px)` : cardWidth,
+        maxHeight: `calc(100dvh - ${edge * 2}px - env(safe-area-inset-bottom, 0px))`,
+      }
+    : {
+        top: cardTop,
+        left: cardLeft,
+        width: cardWidth,
+        maxHeight: `calc(100dvh - ${edge * 2}px)`,
+      }
 
   return (
     <div className="product-tour" role="dialog" aria-modal="true" aria-label="ChessArena tutorial">
@@ -283,8 +317,9 @@ export function ProductTour({
       )}
 
       <div
-        className={`product-tour-card${narrow ? ' product-tour-card--mobile' : ''}`}
-        style={{ top: cardTop, left: cardLeft, width: cardWidth }}
+        ref={cardRef}
+        className={`product-tour-card${dockBottom ? ' product-tour-card--docked' : ''}${narrow ? ' product-tour-card--mobile' : ''}`}
+        style={cardStyle}
       >
         <div className="product-tour-progress">
           {index + 1} / {steps.length}

@@ -2129,12 +2129,39 @@
   pointer-events: auto;
   padding: 1rem 1.1rem 0.95rem;
   border-radius: 16px;
-  background: rgba(10, 14, 22, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: #0b1220;
+  border: 1px solid rgba(255, 255, 255, 0.22);
   color: #f8fafc;
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+/* Beat lobby/theme heading colors that would make text invisible on the dark card */
+.product-tour .product-tour-card,
+.product-tour .product-tour-card .product-tour-progress,
+.product-tour .product-tour-card .product-tour-title,
+.product-tour .product-tour-card h2,
+.product-tour .product-tour-card .product-tour-body,
+.product-tour .product-tour-card p,
+.product-tour .product-tour-card .product-tour-btn {
+  color: #f8fafc;
+}
+
+.product-tour .product-tour-card .product-tour-progress {
+  color: rgba(248, 250, 252, 0.7);
+}
+
+.product-tour .product-tour-card .product-tour-body,
+.product-tour .product-tour-card p.product-tour-body {
+  color: rgba(248, 250, 252, 0.92);
+}
+
+.product-tour .product-tour-card .product-tour-btn.primary {
+  color: #fff;
 }
 
 .product-tour-card--mobile {
@@ -2148,7 +2175,6 @@
   font-size: 0.72rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  opacity: 0.65;
   margin-bottom: 0.45rem;
 }
 
@@ -2156,13 +2182,13 @@
   margin: 0 0 0.4rem;
   font-size: 1.15rem;
   line-height: 1.25;
+  font-weight: 600;
 }
 
 .product-tour-body {
   margin: 0 0 0.9rem;
   font-size: 0.92rem;
   line-height: 1.45;
-  opacity: 0.92;
 }
 
 .product-tour-actions {
@@ -2185,7 +2211,7 @@
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.22);
   background: rgba(255, 255, 255, 0.08);
-  color: #fff;
+  color: #f8fafc;
   font-size: 0.86rem;
   font-weight: 600;
   cursor: pointer;
@@ -2199,6 +2225,7 @@
 .product-tour-btn.primary {
   background: var(--accent, #aa3bff);
   border-color: transparent;
+  color: #fff;
 }
 
 .product-tour-btn.muted {
