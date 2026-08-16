@@ -7,7 +7,7 @@ import {
   type TourAction,
   type TourStep,
 } from '../lib/tutorial'
-import { persistTourVoiceMuted, readTourVoiceMuted, tourVoiceUrl } from '../lib/tourVoice'
+import { persistTourVoiceMuted, tourVoiceUrl } from '../lib/tourVoice'
 
 type Rect = { top: number; left: number; width: number; height: number }
 
@@ -303,12 +303,20 @@ export function ProductTour({
   const [busy, setBusy] = useState(false)
   const [ready, setReady] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [voiceMuted, setVoiceMuted] = useState(readTourVoiceMuted)
-  const [voiceBlocked, setVoiceBlocked] = useState(false)
+  const [voiceMuted, setVoiceMuted] = useState(false)
+  const [tourStarted, setTourStarted] = useState(false)
   const enterGen = useRef(0)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const playingIdRef = useRef<string | null>(null)
+  const onActionRef = useRef(onAction)
+  const onIndexChangeRef = useRef(onIndexChange)
+  const onCloseRef = useRef(onClose)
+  onActionRef.current = onAction
+  onIndexChangeRef.current = onIndexChange
+  onCloseRef.current = onClose
 
   const step: TourStep | undefined = steps[Math.min(index, Math.max(0, steps.length - 1))]
+  const stepId = step?.id
 
   const stopVoice = useCallback(() => {
     const el = audioRef.current
@@ -316,24 +324,17 @@ export function ProductTour({
     el.pause()
   }, [])
 
-  const playVoice = useCallback(
-    (stepId: string, opts?: { fromGesture?: boolean; ignoreMute?: boolean }) => {
-      const el = audioRef.current
-      if (!el) return
-      if (voiceMuted && !opts?.ignoreMute) return
-      el.src = tourVoiceUrl(stepId)
-      el.currentTime = 0
-      const attempt = el.play()
-      if (!attempt) return
-      void attempt.then(() => setVoiceBlocked(false)).catch((err: unknown) => {
-        const name = err instanceof Error ? err.name : ''
-        if (name === 'NotAllowedError' || name === 'NotSupportedError') {
-          if (!opts?.fromGesture) setVoiceBlocked(true)
-        }
-      })
-    },
-    [voiceMuted],
-  )
+  const playVoice = useCallback((id: string) => {
+    const el = audioRef.current
+    if (!el) return
+    if (playingIdRef.current === id && !el.paused && !el.ended) return
+    el.src = tourVoiceUrl(id)
+    el.currentTime = 0
+    playingIdRef.current = id
+    void el.play().catch(() => {
+      playingIdRef.current = null
+    })
+  }, [])
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 900px)')
@@ -383,17 +384,19 @@ export function ProductTour({
   const runEnter = useCallback(async () => {
     if (!active || !step) return
     const gen = ++enterGen.current
+    const current = step
+    const currentIndex = index
     setBusy(true)
     setReady(false)
     setLoadError(null)
 
     try {
-      for (const action of step.enter ?? []) {
+      for (const action of current.enter ?? []) {
         if (enterGen.current !== gen) return
-        await onAction(action)
+        await onActionRef.current(action)
       }
 
-      if (step.screen === 'game') {
+      if (current.screen === 'game') {
         const ok = await waitFor(() => {
           if (enterGen.current !== gen) return true
           const board = document.querySelector('[data-tour="board"]')
@@ -407,17 +410,17 @@ export function ProductTour({
         }
       }
 
-      if (step.screen === 'lobby') {
+      if (current.screen === 'lobby') {
         const ok = await waitFor(() => {
           if (enterGen.current !== gen) return true
-          if (step.target) return Boolean(document.querySelector(`[data-tour="${step.target}"]`))
+          if (current.target) return Boolean(document.querySelector(`[data-tour="${current.target}"]`))
           return true
         }, 8000)
         if (enterGen.current !== gen) return
-        if (!ok && step.target) {
-          if (step.optional) {
-            if (index < steps.length - 1) onIndexChange(index + 1)
-            else onClose()
+        if (!ok && current.target) {
+          if (current.optional) {
+            if (currentIndex < steps.length - 1) onIndexChangeRef.current(currentIndex + 1)
+            else onCloseRef.current()
             return
           }
           setLoadError('Lobby UI is still loading. Tap Retry.')
@@ -426,16 +429,16 @@ export function ProductTour({
         }
       }
 
-      if (step.target && step.target !== 'board') {
+      if (current.target && current.target !== 'board') {
         const found = await waitFor(() => {
           if (enterGen.current !== gen) return true
-          return Boolean(document.querySelector(`[data-tour="${step.target}"]`))
-        }, step.optional ? 1600 : 8000)
+          return Boolean(document.querySelector(`[data-tour="${current.target}"]`))
+        }, current.optional ? 1600 : 8000)
         if (enterGen.current !== gen) return
         if (!found) {
-          if (step.optional) {
-            if (index < steps.length - 1) onIndexChange(index + 1)
-            else onClose()
+          if (current.optional) {
+            if (currentIndex < steps.length - 1) onIndexChangeRef.current(currentIndex + 1)
+            else onCloseRef.current()
             return
           }
         }
@@ -452,17 +455,22 @@ export function ProductTour({
     } finally {
       if (enterGen.current === gen) setBusy(false)
     }
-  }, [active, step, onAction, syncRect, index, steps.length, onIndexChange, onClose])
+  }, [active, stepId, index, steps.length, syncRect, step])
 
   useEffect(() => {
+    if (!active || !stepId) return
     void runEnter()
     return () => {
       enterGen.current += 1
     }
-  }, [runEnter])
+    // Re-run only when the step changes — not when game state refreshes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, stepId])
 
   const finish = useCallback(() => {
     stopVoice()
+    playingIdRef.current = null
+    setTourStarted(false)
     markTutorialSeen()
     void onAction('autoRotateOff')
     void onAction('closeSidebar')
@@ -484,72 +492,91 @@ export function ProductTour({
     onIndexChange(index - 1)
   }, [busy, index, onIndexChange])
 
+  const beginTour = useCallback(async () => {
+    persistTourVoiceMuted(false)
+    setVoiceMuted(false)
+    setTourStarted(true)
+    const el = audioRef.current
+    const firstId = steps[0]?.id
+    if (!el || !firstId) return
+    try {
+      el.src = tourVoiceUrl(firstId)
+      el.muted = true
+      await el.play()
+      el.pause()
+      el.muted = false
+      el.currentTime = 0
+      playingIdRef.current = null
+      if (ready && !loadError) playVoice(firstId)
+    } catch {
+      el.muted = false
+    }
+  }, [steps, ready, loadError, playVoice])
+
   const toggleVoice = useCallback(() => {
-    if (voiceMuted || voiceBlocked) {
+    if (voiceMuted) {
       persistTourVoiceMuted(false)
       setVoiceMuted(false)
-      setVoiceBlocked(false)
-      if (step && ready && !loadError) playVoice(step.id, { fromGesture: true, ignoreMute: true })
+      if (step && tourStarted && ready && !loadError) {
+        playingIdRef.current = null
+        playVoice(step.id)
+      }
       return
     }
     persistTourVoiceMuted(true)
     setVoiceMuted(true)
+    playingIdRef.current = null
     stopVoice()
-  }, [voiceMuted, voiceBlocked, step, ready, loadError, playVoice, stopVoice])
+  }, [voiceMuted, step, tourStarted, ready, loadError, playVoice, stopVoice])
 
   useEffect(() => {
     if (!active) {
+      setTourStarted(false)
+      playingIdRef.current = null
       stopVoice()
-      return
     }
-    if (!ready || !step || loadError || voiceMuted) {
-      stopVoice()
-      return
-    }
-    playVoice(step.id)
-    return () => stopVoice()
-  }, [active, ready, step?.id, voiceMuted, loadError, playVoice, stopVoice, step])
+  }, [active, stopVoice])
 
-  // Auto-advance after the 3D orbit showcase once ready (wait for narration if it's playing).
   useEffect(() => {
-    if (!active || !step?.autoAdvanceMs || !ready || busy || loadError) return
+    if (!active || !tourStarted || voiceMuted || !ready || !step || loadError) return
+    playVoice(step.id)
+  }, [active, tourStarted, voiceMuted, ready, stepId, loadError, playVoice, step])
+
+  useEffect(() => {
+    if (!active || !tourStarted || !ready || busy || loadError || voiceMuted || !step) return
+    const audio = audioRef.current
+    if (!audio) return
     let advanced = false
+    let pauseTimer: number | undefined
     const go = () => {
       if (advanced) return
       advanced = true
       if (index >= steps.length - 1) finish()
       else onIndexChange(index + 1)
     }
-
-    const audio = audioRef.current
-    const waitForVoice = Boolean(audio && !voiceMuted && !voiceBlocked)
-    const fallbackMs = waitForVoice ? Math.max(step.autoAdvanceMs, 18000) : step.autoAdvanceMs
-    const fallback = window.setTimeout(go, fallbackMs)
-    let afterEnd: number | undefined
     const onEnded = () => {
-      afterEnd = window.setTimeout(go, 700)
+      if (playingIdRef.current !== step.id) return
+      pauseTimer = window.setTimeout(go, 1000)
     }
-    if (waitForVoice && audio) audio.addEventListener('ended', onEnded)
-
+    audio.addEventListener('ended', onEnded)
     return () => {
       advanced = true
-      window.clearTimeout(fallback)
-      if (afterEnd) window.clearTimeout(afterEnd)
-      audio?.removeEventListener('ended', onEnded)
+      audio.removeEventListener('ended', onEnded)
+      if (pauseTimer) window.clearTimeout(pauseTimer)
     }
   }, [
     active,
-    step?.autoAdvanceMs,
-    step?.id,
+    tourStarted,
     ready,
     busy,
     loadError,
+    voiceMuted,
+    stepId,
     index,
     steps.length,
     finish,
     onIndexChange,
-    voiceMuted,
-    voiceBlocked,
+    step,
   ])
 
   const bodyText = loadError
@@ -576,7 +603,7 @@ export function ProductTour({
       ro?.disconnect()
       window.removeEventListener('resize', measure)
     }
-  }, [active, index, bodyText, narrow, step?.id])
+  }, [active, index, bodyText, narrow, step?.id, tourStarted])
 
   if (!active || !step) return null
 
@@ -601,7 +628,7 @@ export function ProductTour({
   const edge = 12
   const bottomInset = Math.max(edge, narrow ? 16 : 12) + (narrow ? 8 : 0)
   const cardWidth = narrow ? Math.min(window.innerWidth - edge * 2, 400) : 360
-  const dim = step.dim ?? 'full'
+  const dim = tourStarted ? (step.dim ?? 'full') : 'soft'
   const showcase = Boolean(step.hideSpotlight || (step.placement === 'center' && !highlight))
   const avoid = highlight ? readAvoidRect(step.target) : null
   const slot = showcase
@@ -663,13 +690,19 @@ export function ProductTour({
     return arrowAlongEdge(highlight.left + highlight.width / 2, cardLeft, width)
   })()
 
+  const startCardStyle: CSSProperties = {
+    top: Math.max(edge, window.innerHeight * 0.28),
+    left: narrow ? edge : clamp((window.innerWidth - cardWidth) / 2, edge, window.innerWidth - cardWidth - edge),
+    width: narrow ? `calc(100% - ${edge * 2}px)` : cardWidth,
+  }
+
   return (
     <div className="product-tour" role="dialog" aria-modal="true" aria-label="ChessArena tutorial">
       <div
         className={`product-tour-shade product-tour-shade--${dim}`}
         aria-hidden
       />
-      {highlight && ready && (
+      {tourStarted && highlight && ready && (
         <div
           className="product-tour-spotlight product-tour-spotlight--live"
           style={{
@@ -681,18 +714,35 @@ export function ProductTour({
         />
       )}
 
+      {!tourStarted ? (
+        <div
+          ref={cardRef}
+          className={`product-tour-card product-tour-card--start${narrow ? ' product-tour-card--mobile' : ''}`}
+          style={startCardStyle}
+        >
+          <div className="product-tour-card-main">
+            <h2 className="product-tour-title">Welcome to ChessArena</h2>
+            <p className="product-tour-body">
+              A short walkthrough of the 3D room and the rest of the arena. Tap Start and a guide will talk you through each panel.
+            </p>
+          </div>
+          <div className="product-tour-actions">
+            <button type="button" className="product-tour-btn muted" onClick={finish}>
+              Skip
+            </button>
+            <div className="product-tour-actions-right">
+              <button type="button" className="product-tour-btn primary" onClick={() => void beginTour()}>
+                Start tour
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
       <div
         ref={cardRef}
         key={step.id}
         className={`product-tour-card${slot.dock !== 'free' ? ` product-tour-card--docked product-tour-card--${slot.dock}` : ''}${narrow ? ' product-tour-card--mobile' : ''}`}
         style={cardStyle}
-        onPointerDown={() => {
-          if (!voiceBlocked || voiceMuted || !step || !ready || loadError) return
-          persistTourVoiceMuted(false)
-          setVoiceMuted(false)
-          setVoiceBlocked(false)
-          playVoice(step.id, { fromGesture: true, ignoreMute: true })
-        }}
       >
         {slot.arrow && (
           <span
@@ -718,18 +768,12 @@ export function ProductTour({
           </div>
           <button
             type="button"
-            className={`product-tour-voice${voiceBlocked && !voiceMuted ? ' product-tour-voice--needs-tap' : ''}${voiceMuted ? ' is-muted' : ''}`}
+            className={`product-tour-voice${voiceMuted ? ' is-muted' : ''}`}
             onClick={toggleVoice}
-            aria-pressed={!voiceMuted && !voiceBlocked}
-            aria-label={
-              voiceBlocked && !voiceMuted
-                ? 'Tap to hear the guide'
-                : voiceMuted
-                  ? 'Unmute tour voice'
-                  : 'Mute tour voice'
-            }
+            aria-pressed={!voiceMuted}
+            aria-label={voiceMuted ? 'Unmute tour voice' : 'Mute tour voice'}
           >
-            {voiceBlocked && !voiceMuted ? 'Tap for voice' : voiceMuted ? 'Voice off' : 'Voice on'}
+            {voiceMuted ? 'Unmute' : 'Mute'}
           </button>
         </div>
         <h2 className="product-tour-title">{step.title}</h2>
@@ -774,6 +818,7 @@ export function ProductTour({
           </div>
         </div>
       </div>
+      )}
       <audio ref={audioRef} preload="auto" hidden />
     </div>
   )

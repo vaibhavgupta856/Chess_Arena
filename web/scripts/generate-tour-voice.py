@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "src" / "lib" / "tourNarration.json"
 OUT = ROOT / "public" / "tour" / "voice"
 VOICE = "en-US-AndrewMultilingualNeural"
-RATE = "-8%"
+RATE = "-10%"
 
 
 async def synthesize(step_id: str, text: str) -> None:
