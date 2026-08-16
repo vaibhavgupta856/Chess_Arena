@@ -7,6 +7,7 @@ import {
   type TourAction,
   type TourStep,
 } from '../lib/tutorial'
+import { persistTourVoiceMuted, readTourVoiceMuted, tourVoiceUrl } from '../lib/tourVoice'
 
 type Rect = { top: number; left: number; width: number; height: number }
 
@@ -302,9 +303,37 @@ export function ProductTour({
   const [busy, setBusy] = useState(false)
   const [ready, setReady] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [voiceMuted, setVoiceMuted] = useState(readTourVoiceMuted)
+  const [voiceBlocked, setVoiceBlocked] = useState(false)
   const enterGen = useRef(0)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const step: TourStep | undefined = steps[Math.min(index, Math.max(0, steps.length - 1))]
+
+  const stopVoice = useCallback(() => {
+    const el = audioRef.current
+    if (!el) return
+    el.pause()
+  }, [])
+
+  const playVoice = useCallback(
+    (stepId: string, opts?: { fromGesture?: boolean; ignoreMute?: boolean }) => {
+      const el = audioRef.current
+      if (!el) return
+      if (voiceMuted && !opts?.ignoreMute) return
+      el.src = tourVoiceUrl(stepId)
+      el.currentTime = 0
+      const attempt = el.play()
+      if (!attempt) return
+      void attempt.then(() => setVoiceBlocked(false)).catch((err: unknown) => {
+        const name = err instanceof Error ? err.name : ''
+        if (name === 'NotAllowedError' || name === 'NotSupportedError') {
+          if (!opts?.fromGesture) setVoiceBlocked(true)
+        }
+      })
+    },
+    [voiceMuted],
+  )
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 900px)')
@@ -433,11 +462,12 @@ export function ProductTour({
   }, [runEnter])
 
   const finish = useCallback(() => {
+    stopVoice()
     markTutorialSeen()
     void onAction('autoRotateOff')
     void onAction('closeSidebar')
     onClose()
-  }, [onAction, onClose])
+  }, [onAction, onClose, stopVoice])
 
   const goNext = useCallback(() => {
     if (!step || busy) return
@@ -454,15 +484,73 @@ export function ProductTour({
     onIndexChange(index - 1)
   }, [busy, index, onIndexChange])
 
-  // Auto-advance after the 3D orbit showcase once ready.
+  const toggleVoice = useCallback(() => {
+    if (voiceMuted || voiceBlocked) {
+      persistTourVoiceMuted(false)
+      setVoiceMuted(false)
+      setVoiceBlocked(false)
+      if (step && ready && !loadError) playVoice(step.id, { fromGesture: true, ignoreMute: true })
+      return
+    }
+    persistTourVoiceMuted(true)
+    setVoiceMuted(true)
+    stopVoice()
+  }, [voiceMuted, voiceBlocked, step, ready, loadError, playVoice, stopVoice])
+
+  useEffect(() => {
+    if (!active) {
+      stopVoice()
+      return
+    }
+    if (!ready || !step || loadError || voiceMuted) {
+      stopVoice()
+      return
+    }
+    playVoice(step.id)
+    return () => stopVoice()
+  }, [active, ready, step?.id, voiceMuted, loadError, playVoice, stopVoice, step])
+
+  // Auto-advance after the 3D orbit showcase once ready (wait for narration if it's playing).
   useEffect(() => {
     if (!active || !step?.autoAdvanceMs || !ready || busy || loadError) return
-    const id = window.setTimeout(() => {
+    let advanced = false
+    const go = () => {
+      if (advanced) return
+      advanced = true
       if (index >= steps.length - 1) finish()
       else onIndexChange(index + 1)
-    }, step.autoAdvanceMs)
-    return () => window.clearTimeout(id)
-  }, [active, step?.autoAdvanceMs, step?.id, ready, busy, loadError, index, steps.length, finish, onIndexChange])
+    }
+
+    const audio = audioRef.current
+    const waitForVoice = Boolean(audio && !voiceMuted && !voiceBlocked)
+    const fallbackMs = waitForVoice ? Math.max(step.autoAdvanceMs, 18000) : step.autoAdvanceMs
+    const fallback = window.setTimeout(go, fallbackMs)
+    let afterEnd: number | undefined
+    const onEnded = () => {
+      afterEnd = window.setTimeout(go, 700)
+    }
+    if (waitForVoice && audio) audio.addEventListener('ended', onEnded)
+
+    return () => {
+      advanced = true
+      window.clearTimeout(fallback)
+      if (afterEnd) window.clearTimeout(afterEnd)
+      audio?.removeEventListener('ended', onEnded)
+    }
+  }, [
+    active,
+    step?.autoAdvanceMs,
+    step?.id,
+    ready,
+    busy,
+    loadError,
+    index,
+    steps.length,
+    finish,
+    onIndexChange,
+    voiceMuted,
+    voiceBlocked,
+  ])
 
   const bodyText = loadError
     ? loadError
@@ -598,6 +686,13 @@ export function ProductTour({
         key={step.id}
         className={`product-tour-card${slot.dock !== 'free' ? ` product-tour-card--docked product-tour-card--${slot.dock}` : ''}${narrow ? ' product-tour-card--mobile' : ''}`}
         style={cardStyle}
+        onPointerDown={() => {
+          if (!voiceBlocked || voiceMuted || !step || !ready || loadError) return
+          persistTourVoiceMuted(false)
+          setVoiceMuted(false)
+          setVoiceBlocked(false)
+          playVoice(step.id, { fromGesture: true, ignoreMute: true })
+        }}
       >
         {slot.arrow && (
           <span
@@ -617,8 +712,25 @@ export function ProductTour({
             style={{ width: `${((index + 1) / Math.max(1, steps.length)) * 100}%` }}
           />
         </div>
-        <div className="product-tour-progress">
-          {index + 1} / {steps.length}
+        <div className="product-tour-progress-row">
+          <div className="product-tour-progress">
+            {index + 1} / {steps.length}
+          </div>
+          <button
+            type="button"
+            className={`product-tour-voice${voiceBlocked && !voiceMuted ? ' product-tour-voice--needs-tap' : ''}${voiceMuted ? ' is-muted' : ''}`}
+            onClick={toggleVoice}
+            aria-pressed={!voiceMuted && !voiceBlocked}
+            aria-label={
+              voiceBlocked && !voiceMuted
+                ? 'Tap to hear the guide'
+                : voiceMuted
+                  ? 'Unmute tour voice'
+                  : 'Mute tour voice'
+            }
+          >
+            {voiceBlocked && !voiceMuted ? 'Tap for voice' : voiceMuted ? 'Voice off' : 'Voice on'}
+          </button>
         </div>
         <h2 className="product-tour-title">{step.title}</h2>
         <p className="product-tour-body">{bodyText}</p>
@@ -662,6 +774,7 @@ export function ProductTour({
           </div>
         </div>
       </div>
+      <audio ref={audioRef} preload="auto" hidden />
     </div>
   )
 }
