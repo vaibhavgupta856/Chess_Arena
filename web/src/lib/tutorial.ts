@@ -9,6 +9,7 @@ export type TourAction =
   | 'ensure3d'
   | 'openCamera'
   | 'autoRotateOn'
+  | 'playDemoMoves'
   | 'autoRotateOff'
   | 'openSidebar'
   | 'closeSidebar'
@@ -44,14 +45,14 @@ export const TOUR_STEPS: TourStep[] = [
   {
     id: 'room-3d',
     title: 'Welcome to the 3D room',
-    body: 'This is ChessArena. Watch the board orbit — a real 3D space you can drag around after the tour.',
+    body: 'Watch the room orbit while pieces play — a live 3D game, not a still image.',
     target: 'board',
     placement: 'center',
     screen: 'game',
     dim: 'soft',
     hideSpotlight: true,
-    enter: ['startDemoGame', 'ensure3d', 'closeSidebar', 'autoRotateOn'],
-    autoAdvanceMs: 7000,
+    enter: ['startDemoGame', 'ensure3d', 'closeSidebar', 'autoRotateOn', 'playDemoMoves'],
+    autoAdvanceMs: 11000,
     nextLabel: 'Keep exploring',
   },
   {
