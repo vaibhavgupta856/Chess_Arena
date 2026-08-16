@@ -338,8 +338,8 @@ export function GameLobby({
         </div>
         <h2>Choose your battlefield</h2>
         <p>
-          Instant procedural 3D pieces, adjustable bot strength, live multiplayer, and a built-in
-          coach — pick a mode and play in seconds.
+          A living 3D room, sharp 2D when you want it, bots from beginner to master, and a coach
+          on your shoulder. Pick a mode and you’re playing.
         </p>
       </section>
 

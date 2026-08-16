@@ -47,6 +47,7 @@ export function FriendsPage({ onBack, onJoinGame }: Props) {
   return (
     <div className="friends-page">
       <div className="lobby-panel">
+        <p className="page-kicker">Social</p>
         <h2>Friends</h2>
         <div className="lobby-join-row">
           <input

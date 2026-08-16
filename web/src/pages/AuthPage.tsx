@@ -30,6 +30,7 @@ export function AuthPage({ onDone }: Props) {
 
   return (
     <div className="auth-page lobby-panel">
+      <p className="page-kicker">Account</p>
       <h2>{mode === 'login' ? 'Sign in' : 'Create account'}</h2>
       <p className="lobby-hint">
         Pick any username and password. Usernames must be unique — duplicates are rejected.

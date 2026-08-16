@@ -226,8 +226,9 @@ function App() {
               ♔
             </span>
             <div>
+              <p className="lobby-kicker">Live 3D chess</p>
               <h1>ChessArena</h1>
-              <p>Play chess online, vs bot, or locally — in 2D or 3D.</p>
+              <p className="lobby-tagline">Online rooms, bots, and hot seat — in a room you can orbit.</p>
             </div>
           </div>
           <ThemePicker />
@@ -286,23 +287,30 @@ function App() {
     >
       <div className="room-bg-decor" aria-hidden />
 
-      <header className="app-header">
-        <h1>ChessArena</h1>
-        <p>
-          {game
-            ? game.over
-              ? `Game over — ${game.outcome}`
-              : !atLivePosition
-                ? `Reviewing move ${viewPly}`
-                : game.botThinking
-                  ? 'Bot is thinking…'
-                  : game.waitingFor === 'black' && game.yourColor === 'white'
-                    ? 'You are White — share invite link for opponent'
-                    : game.waitingFor
-                      ? `Waiting for opponent (${game.waitingFor})…`
-                      : `${game.turn} to move${game.inCheck ? ' — check!' : ''}`
-            : 'Loading…'}
-        </p>
+      <header className="app-header game-hud">
+        <div className="game-hud-brand">
+          <span className="game-hud-mark" aria-hidden>
+            ♔
+          </span>
+          <div className="game-hud-copy">
+            <h1>ChessArena</h1>
+            <p>
+              {game
+                ? game.over
+                  ? `Game over — ${game.outcome}`
+                  : !atLivePosition
+                    ? `Reviewing move ${viewPly}`
+                    : game.botThinking
+                      ? 'Bot is thinking…'
+                      : game.waitingFor === 'black' && game.yourColor === 'white'
+                        ? 'You are White — share the invite'
+                        : game.waitingFor
+                          ? `Waiting for ${game.waitingFor}…`
+                          : `${game.turn} to move${game.inCheck ? ' — check!' : ''}`
+                : 'Opening the room…'}
+            </p>
+          </div>
+        </div>
 
         <div className="view-toggle" data-tour="view-toggle">
           <ThemePicker />
