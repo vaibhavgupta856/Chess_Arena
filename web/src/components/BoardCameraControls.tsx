@@ -37,9 +37,16 @@ type Props = {
   cameraAngle: CameraAngleId
   /** When false, orbit is locked (e.g. while dragging a piece). */
   orbitEnabled?: boolean
+  /** Gentle auto orbit for the product tour 3D demo. */
+  autoRotate?: boolean
 }
 
-export function BoardCameraControls({ cameraMode, cameraAngle, orbitEnabled = true }: Props) {
+export function BoardCameraControls({
+  cameraMode,
+  cameraAngle,
+  orbitEnabled = true,
+  autoRotate = false,
+}: Props) {
   const controlsRef = useRef<OrbitControlsImpl>(null)
   const { camera, gl } = useThree()
   const free = cameraMode === 'free'
@@ -65,16 +72,20 @@ export function BoardCameraControls({ cameraMode, cameraAngle, orbitEnabled = tr
   useEffect(() => {
     const controls = controlsRef.current
     if (!controls) return
-    controls.enabled = active
-  }, [active])
+    controls.enabled = active || autoRotate
+    controls.autoRotate = autoRotate && free
+    controls.autoRotateSpeed = 1.15
+  }, [active, autoRotate, free])
 
   return (
     <OrbitControls
       ref={controlsRef}
-      enabled={active}
+      enabled={active || autoRotate}
       enableRotate={active}
-      enableZoom={free && orbitEnabled}
+      enableZoom={free && orbitEnabled && !autoRotate}
       enablePan={false}
+      autoRotate={autoRotate && free}
+      autoRotateSpeed={1.15}
       minPolarAngle={0.25}
       maxPolarAngle={Math.PI / 2.05}
       minDistance={9}

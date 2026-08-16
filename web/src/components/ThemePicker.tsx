@@ -5,7 +5,7 @@ export function ThemePicker() {
   const { themeId, setThemeId } = useTheme()
 
   return (
-    <div className="theme-picker">
+    <div className="theme-picker" data-tour="theme">
       <span className="theme-picker-label">Theme</span>
       <div className="theme-picker-options">
         {BOARD_THEMES.map((theme) => (

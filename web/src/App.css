@@ -2078,3 +2078,127 @@
     border-right-color: var(--border);
   }
 }
+
+/* —— Product tour —— */
+.product-tour {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  pointer-events: none;
+}
+
+.product-tour-shade {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 8, 14, 0.55);
+  pointer-events: auto;
+}
+
+.product-tour-spotlight {
+  position: absolute;
+  border-radius: 16px;
+  box-shadow:
+    0 0 0 9999px rgba(4, 8, 14, 0.62),
+    0 0 0 2px rgba(255, 255, 255, 0.55),
+    0 12px 40px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  transition: top 0.2s ease, left 0.2s ease, width 0.2s ease, height 0.2s ease;
+  z-index: 1;
+}
+
+.product-tour-card {
+  position: absolute;
+  z-index: 2;
+  pointer-events: auto;
+  padding: 1rem 1.1rem 0.95rem;
+  border-radius: 16px;
+  background: rgba(10, 14, 22, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #f8fafc;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.product-tour-progress {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.65;
+  margin-bottom: 0.45rem;
+}
+
+.product-tour-title {
+  margin: 0 0 0.4rem;
+  font-size: 1.15rem;
+  line-height: 1.25;
+}
+
+.product-tour-body {
+  margin: 0 0 0.9rem;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  opacity: 0.92;
+}
+
+.product-tour-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.product-tour-actions-right {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.product-tour-btn {
+  min-height: 40px;
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.product-tour-btn:disabled {
+  opacity: 0.45;
+  cursor: wait;
+}
+
+.product-tour-btn.primary {
+  background: var(--accent, #aa3bff);
+  border-color: transparent;
+}
+
+.product-tour-btn.muted {
+  background: transparent;
+}
+
+@media (max-width: 900px) {
+  .product-tour-card {
+    padding: 0.9rem 0.95rem;
+  }
+
+  .product-tour-title {
+    font-size: 1.05rem;
+  }
+
+  .product-tour-body {
+    font-size: 0.88rem;
+  }
+
+  .product-tour-btn {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product-tour-spotlight {
+    transition: none;
+  }
+}

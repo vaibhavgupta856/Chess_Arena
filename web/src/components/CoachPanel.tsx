@@ -14,7 +14,7 @@ export function CoachPanel({ game }: Props) {
   if (!coachEnabled) return null
 
   return (
-    <div className="sidebar-section coach-panel">
+    <div className="sidebar-section coach-panel" data-tour="sidebar-coach">
       <h3>Coach</h3>
       <p className="lobby-hint">Get hints and learn from your moves.</p>
       <div className="coach-actions">

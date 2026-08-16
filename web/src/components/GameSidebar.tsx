@@ -97,7 +97,7 @@ export function GameSidebar({
           </button>
         )}
       </div>
-      <div className="sidebar-section">
+      <div className="sidebar-section" data-tour="sidebar-game">
         <h3>Game</h3>
         <p className="sidebar-status">{formatOutcome(game)}</p>
         {game.over && game.mode === 'online' && (game.whiteEloDelta || game.blackEloDelta) ? (
@@ -127,7 +127,7 @@ export function GameSidebar({
         </dl>
       </div>
 
-      <div className="sidebar-section history-nav">
+      <div className="sidebar-section history-nav" data-tour="sidebar-history">
         <h3>Time travel</h3>
         <div className="history-nav-row">
           <button
@@ -167,7 +167,7 @@ export function GameSidebar({
       <CoachPanel game={game} />
 
       {!game.over && (
-        <div className="sidebar-section sidebar-actions">
+        <div className="sidebar-section sidebar-actions" data-tour="sidebar-actions">
           <h3>Actions</h3>
           {drawOfferedByOpponent ? (
             <div className="draw-offer-banner">
