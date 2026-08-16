@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   filterTourSteps,
   isNarrowTourViewport,
@@ -37,6 +37,28 @@ function readTargetRect(target?: string): Rect | null {
   }
 }
 
+function waitFor(
+  predicate: () => boolean,
+  timeoutMs: number,
+  intervalMs = 150,
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    const started = Date.now()
+    const tick = () => {
+      if (predicate()) {
+        resolve(true)
+        return
+      }
+      if (Date.now() - started >= timeoutMs) {
+        resolve(false)
+        return
+      }
+      window.setTimeout(tick, intervalMs)
+    }
+    tick()
+  })
+}
+
 export function ProductTour({
   active,
   screen,
@@ -49,6 +71,9 @@ export function ProductTour({
   const steps = useMemo(() => filterTourSteps(TOUR_STEPS, narrow), [narrow])
   const [rect, setRect] = useState<Rect | null>(null)
   const [busy, setBusy] = useState(false)
+  const [ready, setReady] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const enterGen = useRef(0)
 
   const step: TourStep | undefined = steps[Math.min(index, Math.max(0, steps.length - 1))]
 
@@ -60,14 +85,13 @@ export function ProductTour({
     return () => mq.removeEventListener('change', sync)
   }, [])
 
-  // Keep index in range when mobile/desktop filter changes step count.
   useEffect(() => {
     if (index > steps.length - 1) onIndexChange(Math.max(0, steps.length - 1))
   }, [index, steps.length, onIndexChange])
 
   const syncRect = useCallback(() => {
     if (!step) return
-    if (step.target) {
+    if (step.target && !step.hideSpotlight) {
       const el = document.querySelector(`[data-tour="${step.target}"]`) as HTMLElement | null
       el?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' })
     }
@@ -77,7 +101,7 @@ export function ProductTour({
   useLayoutEffect(() => {
     if (!active || !step) return
     syncRect()
-    const id = window.setInterval(syncRect, 300)
+    const id = window.setInterval(syncRect, 250)
     window.addEventListener('resize', syncRect)
     window.addEventListener('scroll', syncRect, true)
     return () => {
@@ -87,29 +111,66 @@ export function ProductTour({
     }
   }, [active, step, screen, syncRect])
 
-  useEffect(() => {
-    if (!active || !step?.enter?.length) return
-    let cancelled = false
-    void (async () => {
-      setBusy(true)
-      try {
-        for (const action of step.enter ?? []) {
-          if (cancelled) return
-          await onAction(action)
-        }
-        await new Promise((r) => window.setTimeout(r, 200))
-        if (!cancelled) syncRect()
-      } finally {
-        if (!cancelled) setBusy(false)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [active, step?.id, onAction, syncRect, step?.enter])
+  const runEnter = useCallback(async () => {
+    if (!active || !step) return
+    const gen = ++enterGen.current
+    setBusy(true)
+    setReady(false)
+    setLoadError(null)
 
-  const waitingForGame = step?.screen === 'game' && screen !== 'game'
-  const waitingForLobby = step?.screen === 'lobby' && screen !== 'lobby'
+    try {
+      for (const action of step.enter ?? []) {
+        if (enterGen.current !== gen) return
+        await onAction(action)
+      }
+
+      if (step.screen === 'game') {
+        const ok = await waitFor(() => {
+          if (enterGen.current !== gen) return true
+          const board = document.querySelector('[data-tour="board"]')
+          return Boolean(board)
+        }, 20000)
+        if (enterGen.current !== gen) return
+        if (!ok) {
+          setLoadError('Could not open the 3D practice room. The chess server may be waking up — try again.')
+          setBusy(false)
+          return
+        }
+      }
+
+      if (step.screen === 'lobby') {
+        const ok = await waitFor(() => {
+          if (enterGen.current !== gen) return true
+          if (step.target) return Boolean(document.querySelector(`[data-tour="${step.target}"]`))
+          return true
+        }, 8000)
+        if (enterGen.current !== gen) return
+        if (!ok && step.target) {
+          setLoadError('Lobby UI is still loading. Tap Retry.')
+          setBusy(false)
+          return
+        }
+      }
+
+      await new Promise((r) => window.setTimeout(r, 120))
+      if (enterGen.current !== gen) return
+      syncRect()
+      setReady(true)
+    } catch (err) {
+      if (enterGen.current !== gen) return
+      const msg = err instanceof Error ? err.message : 'Something went wrong'
+      setLoadError(msg)
+    } finally {
+      if (enterGen.current === gen) setBusy(false)
+    }
+  }, [active, step, onAction, syncRect])
+
+  useEffect(() => {
+    void runEnter()
+    return () => {
+      enterGen.current += 1
+    }
+  }, [runEnter])
 
   const finish = useCallback(() => {
     markTutorialSeen()
@@ -118,52 +179,55 @@ export function ProductTour({
     onClose()
   }, [onAction, onClose])
 
-  const goNext = useCallback(async () => {
+  const goNext = useCallback(() => {
     if (!step || busy) return
-
-    if (step.id === 'enter-3d') {
-      setBusy(true)
-      try {
-        await onAction('startDemoGame')
-        const started = Date.now()
-        while (Date.now() - started < 15000) {
-          await new Promise((r) => window.setTimeout(r, 200))
-          if (document.querySelector('[data-tour="board"]')) break
-        }
-      } finally {
-        setBusy(false)
-      }
-    }
-
+    if (loadError) return
     if (index >= steps.length - 1) {
       finish()
       return
     }
     onIndexChange(index + 1)
-  }, [step, busy, onAction, index, steps.length, finish, onIndexChange])
+  }, [step, busy, loadError, index, steps.length, finish, onIndexChange])
 
   const goBack = useCallback(() => {
     if (busy || index <= 0) return
     onIndexChange(index - 1)
   }, [busy, index, onIndexChange])
 
+  // Auto-advance after the 3D orbit showcase once ready.
+  useEffect(() => {
+    if (!active || !step?.autoAdvanceMs || !ready || busy || loadError) return
+    const id = window.setTimeout(() => {
+      if (index >= steps.length - 1) finish()
+      else onIndexChange(index + 1)
+    }, step.autoAdvanceMs)
+    return () => window.clearTimeout(id)
+  }, [active, step?.autoAdvanceMs, step?.id, ready, busy, loadError, index, steps.length, finish, onIndexChange])
+
   if (!active || !step) return null
 
   const pad = 10
-  const highlight = rect
-    ? {
-        top: Math.max(8, rect.top - pad),
-        left: Math.max(8, rect.left - pad),
-        width: Math.min(window.innerWidth - 16, rect.width + pad * 2),
-        height: Math.min(window.innerHeight - 16, rect.height + pad * 2),
-      }
-    : null
+  const highlight =
+    rect && !step.hideSpotlight
+      ? {
+          top: Math.max(8, rect.top - pad),
+          left: Math.max(8, rect.left - pad),
+          width: Math.min(window.innerWidth - 16, rect.width + pad * 2),
+          height: Math.min(window.innerHeight - 16, rect.height + pad * 2),
+        }
+      : null
 
-  const cardWidth = narrow ? Math.min(window.innerWidth - 24, 340) : 360
+  const cardWidth = narrow ? Math.min(window.innerWidth - 24, 360) : 380
+  const dim = step.dim ?? 'full'
+
   let cardTop = window.innerHeight / 2 - 90
   let cardLeft = window.innerWidth / 2 - cardWidth / 2
 
-  if (highlight && step.placement !== 'center') {
+  // Dock the 3D showcase card near the bottom so the room stays visible.
+  if (step.hideSpotlight || step.placement === 'center') {
+    cardTop = narrow ? window.innerHeight - 210 : window.innerHeight - 200
+    cardLeft = window.innerWidth / 2 - cardWidth / 2
+  } else if (highlight) {
     const gap = 14
     switch (step.placement) {
       case 'bottom':
@@ -171,7 +235,7 @@ export function ProductTour({
         cardLeft = highlight.left + highlight.width / 2 - cardWidth / 2
         break
       case 'top':
-        cardTop = highlight.top - gap - 160
+        cardTop = highlight.top - gap - 150
         cardLeft = highlight.left + highlight.width / 2 - cardWidth / 2
         break
       case 'left':
@@ -187,13 +251,26 @@ export function ProductTour({
     }
   }
 
-  cardTop = clamp(cardTop, 12, window.innerHeight - 220)
+  cardTop = clamp(cardTop, 12, window.innerHeight - (narrow ? 200 : 180))
   cardLeft = clamp(cardLeft, 12, window.innerWidth - cardWidth - 12)
+
+  const bodyText = loadError
+    ? loadError
+    : busy && !ready
+      ? step.screen === 'game'
+        ? 'Opening your 3D practice room… (server may take a moment to wake)'
+        : 'Loading…'
+      : step.body
+
+  const nextDisabled = busy || Boolean(loadError) || (!ready && Boolean(step.enter?.length || step.screen === 'game'))
 
   return (
     <div className="product-tour" role="dialog" aria-modal="true" aria-label="ChessArena tutorial">
-      <div className="product-tour-shade" aria-hidden />
-      {highlight && !(waitingForGame || waitingForLobby) && (
+      <div
+        className={`product-tour-shade product-tour-shade--${dim}`}
+        aria-hidden
+      />
+      {highlight && ready && (
         <div
           className="product-tour-spotlight"
           style={{
@@ -206,38 +283,50 @@ export function ProductTour({
       )}
 
       <div
-        className="product-tour-card"
+        className={`product-tour-card${narrow ? ' product-tour-card--mobile' : ''}`}
         style={{ top: cardTop, left: cardLeft, width: cardWidth }}
       >
         <div className="product-tour-progress">
           {index + 1} / {steps.length}
         </div>
         <h2 className="product-tour-title">{step.title}</h2>
-        <p className="product-tour-body">
-          {waitingForGame
-            ? 'Opening your 3D practice room…'
-            : waitingForLobby
-              ? 'Returning to the lobby…'
-              : step.body}
-        </p>
+        <p className="product-tour-body">{bodyText}</p>
         <div className="product-tour-actions">
-          <button type="button" className="product-tour-btn muted" onClick={finish} disabled={busy}>
+          <button type="button" className="product-tour-btn muted" onClick={finish}>
             Skip
           </button>
           <div className="product-tour-actions-right">
-            {index > 0 && (
-              <button type="button" className="product-tour-btn muted" onClick={goBack} disabled={busy}>
-                Back
+            {loadError ? (
+              <button
+                type="button"
+                className="product-tour-btn primary"
+                onClick={() => void runEnter()}
+                disabled={busy}
+              >
+                Retry
               </button>
+            ) : (
+              <>
+                {index > 0 && (
+                  <button
+                    type="button"
+                    className="product-tour-btn muted"
+                    onClick={goBack}
+                    disabled={busy}
+                  >
+                    Back
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="product-tour-btn primary"
+                  onClick={goNext}
+                  disabled={nextDisabled}
+                >
+                  {busy && !ready ? 'Loading…' : step.nextLabel ?? (index >= steps.length - 1 ? 'Finish' : 'Next')}
+                </button>
+              </>
             )}
-            <button
-              type="button"
-              className="product-tour-btn primary"
-              onClick={() => void goNext()}
-              disabled={busy || waitingForGame}
-            >
-              {busy ? 'Working…' : step.nextLabel ?? (index >= steps.length - 1 ? 'Finish' : 'Next')}
-            </button>
           </div>
         </div>
       </div>
@@ -249,11 +338,11 @@ export function useShouldAutoStartTour() {
   const [should, setShould] = useState(false)
   useEffect(() => {
     try {
-      if (localStorage.getItem('chessarena-tutorial-v1') === '1') return
+      if (localStorage.getItem('chessarena-tutorial-v2') === '1') return
     } catch {
       // ignore
     }
-    const id = window.setTimeout(() => setShould(true), 800)
+    const id = window.setTimeout(() => setShould(true), 500)
     return () => window.clearTimeout(id)
   }, [])
   return [should, setShould] as const

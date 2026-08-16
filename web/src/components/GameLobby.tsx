@@ -3,7 +3,7 @@ import type { BotLevel, CreateGameOptions, FriendChallenge, GameMode, UserProfil
 import { BOT_LEVELS } from '../types'
 
 type Props = {
-  onCreate: (options: CreateGameOptions) => Promise<void>
+  onCreate: (options: CreateGameOptions) => Promise<boolean | void>
   onJoin: (gameId: string) => Promise<void>
   error: string | null
   apiBase: string
@@ -103,7 +103,7 @@ export function GameLobby({
     return () => window.clearInterval(id)
   }, [apiBase, serverOk])
 
-  const run = async (action: () => Promise<void>) => {
+  const run = async (action: () => Promise<unknown>) => {
     setBusy(true)
     setActionError(null)
     try {

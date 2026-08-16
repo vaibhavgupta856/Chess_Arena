@@ -867,7 +867,7 @@ export function ChessBoard3D({
   }, [narrow, tourShowCamera, tourAutoRotate])
 
   return (
-    <div className="board-3d" data-tour="board">
+    <div className="board-3d">
       {!hideCameraUi && (
         <div className="board-3d-ui">
           {!camOpen ? (

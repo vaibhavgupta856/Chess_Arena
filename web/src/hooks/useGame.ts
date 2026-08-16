@@ -142,14 +142,14 @@ export function useGame() {
   }, [])
 
   const createGame = useCallback(
-    async (options: CreateGameOptions) => {
+    async (options: CreateGameOptions): Promise<boolean> => {
       try {
         setError(null)
         if (!API_BASE) {
           setError(
             'Chess server is not connected. The live site needs the Go API deployed (see render.yaml in the repo).',
           )
-          return
+          return false
         }
         const playAs =
           options.playAs === 'random'
@@ -166,10 +166,12 @@ export function useGame() {
             clientId: hostId,
             botLevel: options.botLevel ?? 'casual',
           }),
+          signal: AbortSignal.timeout(45000),
         })
         if (!res.ok) throw new Error(await res.text())
         const data = (await res.json()) as GameState
         applyGame(data, seatClientId(data, hostId), true, true)
+        return true
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed to create game'
         if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
@@ -181,6 +183,7 @@ export function useGame() {
         } else {
           setError(msg)
         }
+        return false
       }
     },
     [applyGame, hostId],

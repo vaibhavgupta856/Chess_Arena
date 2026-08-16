@@ -74,7 +74,7 @@ export function BoardCameraControls({
     if (!controls) return
     controls.enabled = active || autoRotate
     controls.autoRotate = autoRotate && free
-    controls.autoRotateSpeed = 1.15
+    controls.autoRotateSpeed = autoRotate ? 2.4 : 1.15
   }, [active, autoRotate, free])
 
   return (
@@ -85,7 +85,7 @@ export function BoardCameraControls({
       enableZoom={free && orbitEnabled && !autoRotate}
       enablePan={false}
       autoRotate={autoRotate && free}
-      autoRotateSpeed={1.15}
+      autoRotateSpeed={autoRotate ? 2.4 : 1.15}
       minPolarAngle={0.25}
       maxPolarAngle={Math.PI / 2.05}
       minDistance={9}

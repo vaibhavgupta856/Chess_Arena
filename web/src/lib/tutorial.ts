@@ -1,4 +1,4 @@
-const TOUR_STORAGE_KEY = 'chessarena-tutorial-v1'
+const TOUR_STORAGE_KEY = 'chessarena-tutorial-v2'
 
 export type TourPlacement = 'center' | 'top' | 'bottom' | 'left' | 'right'
 
@@ -22,96 +22,43 @@ export type TourStep = {
   screen?: 'lobby' | 'game' | 'any'
   mobileOnly?: boolean
   desktopOnly?: boolean
+  /** Soft dim so the 3D room stays visible during the orbit demo */
+  dim?: 'full' | 'soft' | 'none'
+  /** Hide the cutout spotlight (useful for full-board 3D) */
+  hideSpotlight?: boolean
+  /** Auto-advance after this many ms once the step is ready */
+  autoAdvanceMs?: number
   /** Run when the step becomes active */
   enter?: TourAction[]
   /** Primary button label override */
   nextLabel?: string
 }
 
+/**
+ * Tour order: 3D room first (with auto-orbit), then in-game panels, then lobby.
+ */
 export const TOUR_STEPS: TourStep[] = [
   {
-    id: 'welcome',
-    title: 'Welcome to ChessArena',
-    body: 'A quick tour of the lobby, the 3D chess room, and the game tools. Works the same on phone and desktop.',
-    placement: 'center',
-    screen: 'any',
-    enter: ['ensureLobbyPlay', 'closeSidebar', 'autoRotateOff'],
-    nextLabel: 'Start tour',
-  },
-  {
-    id: 'brand',
-    title: 'Your arena',
-    body: 'ChessArena is where you play online, vs bot, or hot-seat — in 2D or immersive 3D.',
-    target: 'brand',
-    placement: 'bottom',
-    screen: 'lobby',
-  },
-  {
-    id: 'theme',
-    title: 'Themes',
-    body: 'Swap board and room looks anytime. Your choice is saved for next visit.',
-    target: 'theme',
-    placement: 'bottom',
-    screen: 'lobby',
-  },
-  {
-    id: 'nav',
-    title: 'Account & social',
-    body: 'Sign in for profile, friends, challenges, and the leaderboard. Guests can still jump into a game.',
-    target: 'nav',
-    placement: 'bottom',
-    screen: 'lobby',
-  },
-  {
-    id: 'play',
-    title: 'Play modes',
-    body: 'Start vs Bot, create an Online Room, or play Hot Seat on one device. Cards open a room instantly.',
-    target: 'play',
-    placement: 'top',
-    screen: 'lobby',
-  },
-  {
-    id: 'bot-level',
-    title: 'Bot strength',
-    body: 'Pick how hard the engine plays before you tap Play vs Bot.',
-    target: 'bot-level',
-    placement: 'top',
-    screen: 'lobby',
-  },
-  {
-    id: 'join',
-    title: 'Join a room',
-    body: 'Paste a room code or invite link here to sit as the second player.',
-    target: 'join',
-    placement: 'top',
-    screen: 'lobby',
-  },
-  {
-    id: 'enter-3d',
-    title: 'Enter the 3D room',
-    body: 'Next we open a practice bot game and spin the camera so you can see the board in 3D.',
-    placement: 'center',
-    screen: 'lobby',
-    enter: ['ensureLobbyPlay'],
-    nextLabel: 'Open 3D demo',
-  },
-  {
     id: 'room-3d',
-    title: 'This is your 3D room',
-    body: 'Watch the board orbit — that’s the free-drag camera. After the tour, drag with one finger (or mouse) to look around yourself.',
+    title: 'This is your 3D chess room',
+    body: 'Watch the board orbit — ChessArena is a real 3D space. After the tour, drag with one finger (or mouse) to look around yourself.',
     target: 'board',
     placement: 'center',
     screen: 'game',
-    enter: ['ensure3d', 'closeSidebar', 'autoRotateOn'],
-    nextLabel: 'Nice — continue',
+    dim: 'soft',
+    hideSpotlight: true,
+    enter: ['startDemoGame', 'ensure3d', 'closeSidebar', 'autoRotateOn'],
+    autoAdvanceMs: 6500,
+    nextLabel: 'Continue',
   },
   {
     id: 'camera',
     title: 'Camera controls',
-    body: 'Switch Free drag vs Fixed angles, or pick a preset view. On phones, tap Cam to open this panel.',
+    body: 'Free drag lets you orbit the room. Fixed locks to a preset angle. On phones, tap Cam to open this panel.',
     target: 'camera',
     placement: 'left',
     screen: 'game',
+    dim: 'full',
     enter: ['ensure3d', 'autoRotateOff', 'openCamera', 'closeSidebar'],
   },
   {
@@ -121,12 +68,12 @@ export const TOUR_STEPS: TourStep[] = [
     target: 'view-toggle',
     placement: 'bottom',
     screen: 'game',
-    enter: ['autoRotateOff'],
+    enter: ['autoRotateOff', 'closeSidebar'],
   },
   {
     id: 'mobile-bar',
     title: 'Mobile game bar',
-    body: 'On phones: status, step through moves, and Menu to open the full game panel.',
+    body: 'Status, step through moves, and Menu for the full game panel.',
     target: 'mobile-bar',
     placement: 'top',
     screen: 'game',
@@ -136,43 +83,60 @@ export const TOUR_STEPS: TourStep[] = [
   {
     id: 'sidebar-game',
     title: 'Game panel',
-    body: 'Room info, whose turn it is, and (when timed) clocks. On mobile this slides up from Menu.',
+    body: 'Room info, whose turn it is, and clocks when timed. On mobile this slides up from Menu.',
     target: 'sidebar-game',
     placement: 'left',
     screen: 'game',
     enter: ['openSidebar'],
   },
   {
-    id: 'sidebar-history',
-    title: 'Time travel',
-    body: 'Step back and forward through the move list to review positions without changing the live game.',
+    id: 'sidebar-tools',
+    title: 'History & coach',
+    body: 'Replay moves with time travel. In bot and local games, Coach can hint, review, or advise.',
     target: 'sidebar-history',
     placement: 'left',
     screen: 'game',
     enter: ['openSidebar'],
   },
   {
-    id: 'sidebar-coach',
-    title: 'Coach',
-    body: 'In bot and local games, ask for a hint, review the last move, or get position advice.',
-    target: 'sidebar-coach',
-    placement: 'left',
-    screen: 'game',
-    enter: ['openSidebar'],
-  },
-  {
     id: 'sidebar-actions',
-    title: 'Actions',
-    body: 'Offer or claim draws, resign, or leave back to the lobby when you’re done.',
+    title: 'Game actions',
+    body: 'Offer or claim draws, resign, or leave back to the lobby.',
     target: 'sidebar-actions',
     placement: 'left',
     screen: 'game',
     enter: ['openSidebar'],
   },
   {
+    id: 'lobby-play',
+    title: 'Start any mode',
+    body: 'From the lobby: Play vs Bot, Online Room, or Hot Seat. Pick bot strength, then tap a card.',
+    target: 'play',
+    placement: 'top',
+    screen: 'lobby',
+    enter: ['autoRotateOff', 'closeSidebar', 'ensureLobbyPlay'],
+  },
+  {
+    id: 'lobby-join',
+    title: 'Join a room',
+    body: 'Paste a room code or invite link here to sit as the second player.',
+    target: 'join',
+    placement: 'top',
+    screen: 'lobby',
+    enter: ['ensureLobbyPlay'],
+  },
+  {
+    id: 'lobby-chrome',
+    title: 'Themes & account',
+    body: 'Swap looks anytime. Sign in for profile, friends, challenges, and the leaderboard — guests can still play.',
+    target: 'theme',
+    placement: 'bottom',
+    screen: 'lobby',
+  },
+  {
     id: 'done',
     title: 'You’re ready',
-    body: 'Drag pieces to move (or tap–tap), rotate the 3D view, and use Menu on mobile for the full panel. Replay this tour anytime from the lobby.',
+    body: 'Orbit the 3D room, drag pieces to move, and use Menu on mobile for the full panel. Replay this tour anytime from Tutorial in the lobby.',
     placement: 'center',
     screen: 'any',
     enter: ['closeSidebar', 'autoRotateOff'],
