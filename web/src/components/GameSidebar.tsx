@@ -16,6 +16,7 @@ type Props = {
   onLeave: () => void
   open?: boolean
   onClose?: () => void
+  showTourInvite?: boolean
 }
 
 function formatOutcome(game: GameState) {
@@ -57,6 +58,7 @@ export function GameSidebar({
   onLeave,
   open = true,
   onClose,
+  showTourInvite = false,
 }: Props) {
   const yourColor = game.yourColor || (game.mode === 'local' ? 'both' : '—')
   const canAct = canPlayerMove(game, atLivePosition)
@@ -154,13 +156,17 @@ export function GameSidebar({
         </div>
       </div>
 
-      {inviteLink && (
+      {(inviteLink || showTourInvite) && (
         <div className="sidebar-section" data-tour="sidebar-invite">
           <h3>Invite friend</h3>
           <p className="lobby-hint">Send this link — they join as black on their device.</p>
-          <button type="button" className="sidebar-btn" onClick={copyInvite}>
-            Copy invite link
-          </button>
+          {inviteLink ? (
+            <button type="button" className="sidebar-btn" onClick={copyInvite}>
+              Copy invite link
+            </button>
+          ) : (
+            <p className="lobby-hint">Online rooms get a share link here.</p>
+          )}
         </div>
       )}
 

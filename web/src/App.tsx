@@ -83,8 +83,10 @@ function App() {
   const demoCreateLock = useRef<Promise<void> | null>(null)
   const themeCycleRef = useRef<number | null>(null)
   const themeRestoreRef = useRef<string | null>(null)
+  const themeIdRef = useRef(themeId)
   screenRef.current = screen
   gameRef.current = game
+  themeIdRef.current = themeId
 
   const is3d = view === '3d' && screen === 'game'
   const canMove = game ? canPlayerMove(game, atLivePosition) : false
@@ -203,7 +205,7 @@ function App() {
           break
         case 'cycleThemes': {
           stopThemeCycle(false)
-          if (!themeRestoreRef.current) themeRestoreRef.current = themeId
+          if (!themeRestoreRef.current) themeRestoreRef.current = themeIdRef.current
           const ids = BOARD_THEMES.map((item) => item.id)
           if (ids.length === 0) break
           let i = Math.max(0, ids.indexOf(themeRestoreRef.current))
@@ -221,7 +223,7 @@ function App() {
           break
       }
     },
-    [createGame, leaveToLobby, playDemoMoves, setThemeId, stopThemeCycle, themeId],
+    [createGame, leaveToLobby, playDemoMoves, setThemeId, stopThemeCycle],
   )
 
   const closeTour = useCallback(() => {
@@ -430,6 +432,7 @@ function App() {
               onLeave={leaveToLobby}
               open={sidebarOpen}
               onClose={() => setSidebarOpen(false)}
+              showTourInvite={tourActive}
             />
 
             <MobileGameBar
