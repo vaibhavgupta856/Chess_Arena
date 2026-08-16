@@ -51,7 +51,7 @@ function placeCardClearOfHighlight(
   bottomInset: number,
   gap: number,
 ): CardSlot {
-  const minCard = 148
+  const minCard = 232
   const maxTop = Math.max(edge, vh - minCard - bottomInset)
 
   if (!highlight) {
@@ -416,8 +416,8 @@ export function ProductTour({
     ? {
         top: 0,
         left: narrow ? edge : (window.innerWidth - cardWidth) / 2,
-        maxHeight: Math.min(cardHeight, window.innerHeight * 0.42),
-        dock: 'bottom' as const,
+        maxHeight: Math.min(Math.max(cardHeight, 240), window.innerHeight * 0.4),
+        dock: (step.placement === 'top' ? 'top' : 'bottom') as 'top' | 'bottom',
       }
     : placeCardClearOfHighlight(
         highlight,
@@ -440,7 +440,7 @@ export function ProductTour({
           bottom: `max(${bottomInset}px, env(safe-area-inset-bottom, 0px))`,
           left: narrow ? edge : clamp(slot.left, edge, window.innerWidth - cardWidth - edge),
           width: narrow ? `calc(100% - ${edge * 2}px)` : cardWidth,
-          maxHeight: `min(${Math.max(148, slot.maxHeight)}px, 42dvh)`,
+          maxHeight: `min(${Math.max(240, slot.maxHeight)}px, 56dvh)`,
         }
       : slot.dock === 'top'
         ? {
@@ -448,13 +448,13 @@ export function ProductTour({
             bottom: 'auto',
             left: narrow ? edge : clamp(slot.left, edge, window.innerWidth - cardWidth - edge),
             width: narrow ? `calc(100% - ${edge * 2}px)` : cardWidth,
-            maxHeight: `min(${Math.max(148, slot.maxHeight)}px, 42dvh)`,
+            maxHeight: `min(${Math.max(240, slot.maxHeight)}px, 56dvh)`,
           }
         : {
             top: slot.top,
             left: slot.left,
             width: cardWidth,
-            maxHeight: `min(${Math.max(148, slot.maxHeight)}px, 48dvh)`,
+            maxHeight: `min(${Math.max(240, slot.maxHeight)}px, 56dvh)`,
           }
 
   return (
@@ -481,6 +481,7 @@ export function ProductTour({
         className={`product-tour-card${slot.dock !== 'free' ? ` product-tour-card--docked product-tour-card--${slot.dock}` : ''}${narrow ? ' product-tour-card--mobile' : ''}`}
         style={cardStyle}
       >
+        <div className="product-tour-card-main">
         <div className="product-tour-track" aria-hidden>
           <div
             className="product-tour-track-fill"
@@ -492,6 +493,7 @@ export function ProductTour({
         </div>
         <h2 className="product-tour-title">{step.title}</h2>
         <p className="product-tour-body">{bodyText}</p>
+        </div>
         <div className="product-tour-actions">
           <button type="button" className="product-tour-btn muted" onClick={finish}>
             Skip

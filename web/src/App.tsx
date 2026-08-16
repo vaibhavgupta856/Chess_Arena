@@ -143,6 +143,11 @@ function App() {
           await demoCreateLock.current
           break
         }
+        case 'ensure2d':
+          setView('2d')
+          setTourAutoRotate(false)
+          setTourShowCamera(false)
+          break
         case 'ensure3d':
           setView('3d')
           break
