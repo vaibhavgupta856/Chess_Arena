@@ -2090,13 +2090,30 @@
 .product-tour-shade {
   position: absolute;
   inset: 0;
-  background: rgba(4, 8, 14, 0.55);
   pointer-events: auto;
+}
+
+.product-tour-shade--full {
+  background: rgba(4, 8, 14, 0.55);
+}
+
+.product-tour-shade--soft {
+  background: linear-gradient(
+    180deg,
+    rgba(4, 8, 14, 0.18) 0%,
+    rgba(4, 8, 14, 0.08) 42%,
+    rgba(4, 8, 14, 0.72) 100%
+  );
+}
+
+.product-tour-shade--none {
+  background: transparent;
+  pointer-events: none;
 }
 
 .product-tour-spotlight {
   position: absolute;
-  border-radius: 16px;
+  border-radius: 14px;
   box-shadow:
     0 0 0 9999px rgba(4, 8, 14, 0.62),
     0 0 0 2px rgba(255, 255, 255, 0.55),
@@ -2118,6 +2135,13 @@
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+}
+
+.product-tour-card--mobile {
+  left: 12px !important;
+  right: 12px;
+  width: auto !important;
+  max-width: none;
 }
 
 .product-tour-progress {
@@ -2151,6 +2175,8 @@
 .product-tour-actions-right {
   display: flex;
   gap: 0.4rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .product-tour-btn {

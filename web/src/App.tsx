@@ -1,6 +1,6 @@
 import './App.css'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { ChessBoard2D } from './components/ChessBoard2D'
 import { ChessBoard3D } from './components/ChessBoard3D'
@@ -77,6 +77,11 @@ function App() {
   const [tourIndex, setTourIndex] = useState(0)
   const [tourAutoRotate, setTourAutoRotate] = useState(false)
   const [tourShowCamera, setTourShowCamera] = useState(false)
+  const screenRef = useRef(screen)
+  const gameRef = useRef(game)
+  const demoCreateLock = useRef<Promise<void> | null>(null)
+  screenRef.current = screen
+  gameRef.current = game
 
   const is3d = view === '3d' && screen === 'game'
   const canMove = game ? canPlayerMove(game, atLivePosition) : false
@@ -111,15 +116,33 @@ function App() {
           setSidebarOpen(false)
           setTourAutoRotate(false)
           setTourShowCamera(false)
-          if (screen === 'game') leaveToLobby()
+          if (screenRef.current === 'game') leaveToLobby()
           break
-        case 'startDemoGame':
+        case 'startDemoGame': {
           setLobbyView('play')
           setView('3d')
           setSidebarOpen(false)
           setTourShowCamera(false)
-          await createGame({ mode: 'bot', playAs: 'white', botLevel: 'beginner' })
+          if (screenRef.current === 'game' && gameRef.current) break
+          if (demoCreateLock.current) {
+            await demoCreateLock.current
+            break
+          }
+          const run = (async () => {
+            if (screenRef.current === 'game' && gameRef.current) return
+            const ok = await createGame({ mode: 'bot', playAs: 'white', botLevel: 'beginner' })
+            if (!ok) {
+              throw new Error(
+                'Could not open the 3D practice room. Wait a moment for the chess server to wake, then tap Retry.',
+              )
+            }
+          })()
+          demoCreateLock.current = run.finally(() => {
+            demoCreateLock.current = null
+          })
+          await demoCreateLock.current
           break
+        }
         case 'ensure3d':
           setView('3d')
           break
@@ -149,7 +172,7 @@ function App() {
           break
       }
     },
-    [createGame, leaveToLobby, screen],
+    [createGame, leaveToLobby],
   )
 
   const closeTour = useCallback(() => {
@@ -310,7 +333,7 @@ function App() {
               )}
 
               {view === '3d' && (
-                <div className="board-view board-view--fullscreen">
+                <div className="board-view board-view--fullscreen" data-tour="board">
                   <ChessBoard3D
                     game={game}
                     displayFen={displayFen}
