@@ -23,6 +23,132 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n))
 }
 
+function boxesOverlap(a: Rect, b: Rect, gap: number) {
+  return !(
+    a.left + a.width + gap <= b.left ||
+    b.left + b.width + gap <= a.left ||
+    a.top + a.height + gap <= b.top ||
+    b.top + b.height + gap <= a.top
+  )
+}
+
+type CardSlot = {
+  top: number
+  left: number
+  maxHeight: number
+  dock: 'top' | 'bottom' | 'free'
+}
+
+/** Place the tour card in a viewport slot that does not cover the spotlight. */
+function placeCardClearOfHighlight(
+  highlight: Rect | null,
+  cardW: number,
+  cardH: number,
+  preferred: TourStep['placement'],
+  vw: number,
+  vh: number,
+  edge: number,
+  bottomInset: number,
+  gap: number,
+): CardSlot {
+  const minCard = 148
+  const maxTop = Math.max(edge, vh - minCard - bottomInset)
+
+  if (!highlight) {
+    return {
+      top: Math.max(edge, vh - cardH - bottomInset),
+      left: clamp((vw - cardW) / 2, edge, Math.max(edge, vw - cardW - edge)),
+      maxHeight: Math.min(cardH, vh - edge - bottomInset),
+      dock: 'bottom',
+    }
+  }
+
+  const spaceAbove = highlight.top - edge
+  const spaceBelow = vh - bottomInset - (highlight.top + highlight.height)
+  const spaceLeft = highlight.left - edge
+  const spaceRight = vw - edge - (highlight.left + highlight.width)
+
+  const fits = (space: number) => space >= Math.min(cardH, minCard) + gap
+
+  const order: Array<'below' | 'above' | 'right' | 'left'> = []
+  const push = (side: 'below' | 'above' | 'right' | 'left') => {
+    if (!order.includes(side)) order.push(side)
+  }
+
+  if (preferred === 'top') push('above')
+  else if (preferred === 'bottom') push('below')
+  else if (preferred === 'left') push('left')
+  else if (preferred === 'right') push('right')
+
+  // Prefer the larger vertical gap — that's what stays readable on phones.
+  if (spaceBelow >= spaceAbove) {
+    push('below')
+    push('above')
+  } else {
+    push('above')
+    push('below')
+  }
+  if (spaceRight >= spaceLeft) {
+    push('right')
+    push('left')
+  } else {
+    push('left')
+    push('right')
+  }
+
+  for (const side of order) {
+    if (side === 'below' && !fits(spaceBelow) && fits(spaceAbove)) continue
+    if (side === 'above' && !fits(spaceAbove) && fits(spaceBelow)) continue
+    if (side === 'left' && spaceLeft < cardW + gap) continue
+    if (side === 'right' && spaceRight < cardW + gap) continue
+
+    let top = edge
+    let left = clamp(highlight.left + highlight.width / 2 - cardW / 2, edge, Math.max(edge, vw - cardW - edge))
+    let maxHeight = cardH
+
+    if (side === 'below') {
+      top = highlight.top + highlight.height + gap
+      maxHeight = Math.max(minCard, spaceBelow - gap)
+    } else if (side === 'above') {
+      maxHeight = Math.max(minCard, spaceAbove - gap)
+      top = highlight.top - gap - Math.min(cardH, maxHeight)
+    } else if (side === 'right') {
+      left = highlight.left + highlight.width + gap
+      top = clamp(highlight.top + highlight.height / 2 - cardH / 2, edge, maxTop)
+      maxHeight = vh - top - bottomInset
+    } else {
+      left = highlight.left - gap - cardW
+      top = clamp(highlight.top + highlight.height / 2 - cardH / 2, edge, maxTop)
+      maxHeight = vh - top - bottomInset
+    }
+
+    top = clamp(top, edge, Math.max(edge, vh - Math.min(cardH, maxHeight) - bottomInset))
+    left = clamp(left, edge, Math.max(edge, vw - cardW - edge))
+    const box = { top, left, width: cardW, height: Math.min(cardH, maxHeight) }
+    if (boxesOverlap(box, highlight, gap - 2)) continue
+
+    const dock: CardSlot['dock'] =
+      side === 'below' && top + box.height >= vh - bottomInset - 8
+        ? 'bottom'
+        : side === 'above' && top <= edge + 4
+          ? 'top'
+          : 'free'
+    return { top, left, maxHeight, dock }
+  }
+
+  // Last resort: park the card on the side of the screen opposite the target.
+  const targetMid = highlight.top + highlight.height / 2
+  if (targetMid > vh / 2) {
+    return { top: edge, left: edge, maxHeight: Math.max(minCard, spaceAbove - gap), dock: 'top' }
+  }
+  return {
+    top: vh - bottomInset - Math.min(cardH, Math.max(minCard, spaceBelow)),
+    left: edge,
+    maxHeight: Math.max(minCard, spaceBelow - gap),
+    dock: 'bottom',
+  }
+}
+
 function readTargetRect(target?: string): Rect | null {
   if (!target) return null
   const el = document.querySelector(`[data-tour="${target}"]`) as HTMLElement | null
@@ -91,12 +217,23 @@ export function ProductTour({
 
   const syncRect = useCallback(() => {
     if (!step) return
-    if (step.target && !step.hideSpotlight) {
-      const el = document.querySelector(`[data-tour="${step.target}"]`) as HTMLElement | null
-      el?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' })
-    }
     setRect(readTargetRect(step.target))
   }, [step])
+
+  useEffect(() => {
+    if (!active || !step?.target || step.hideSpotlight) return
+    const el = document.querySelector(`[data-tour="${step.target}"]`) as HTMLElement | null
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    const mid = r.top + r.height / 2
+    el.scrollIntoView({
+      block: mid > window.innerHeight * 0.55 ? 'end' : 'start',
+      inline: 'nearest',
+      behavior: 'smooth',
+    })
+    const id = window.setTimeout(() => setRect(readTargetRect(step.target)), 280)
+    return () => window.clearTimeout(id)
+  }, [active, step?.id, step?.target, step?.hideSpotlight])
 
   useLayoutEffect(() => {
     if (!active || !step) return
@@ -253,70 +390,72 @@ export function ProductTour({
   if (!active || !step) return null
 
   const pad = 10
-  const highlight =
-    rect && !step.hideSpotlight
-      ? {
-          top: Math.max(8, rect.top - pad),
-          left: Math.max(8, rect.left - pad),
-          width: Math.min(window.innerWidth - 16, rect.width + pad * 2),
-          height: Math.min(window.innerHeight - 16, rect.height + pad * 2),
-        }
-      : null
+  const highlight = (() => {
+    if (!rect || step.hideSpotlight) return null
+    const maxH = Math.min(window.innerHeight - 16, window.innerHeight * 0.5)
+    const height = Math.min(window.innerHeight - 16, rect.height + pad * 2, maxH)
+    let top = Math.max(8, rect.top - pad)
+    // If the target is taller than the spotlight, keep the on-screen slice.
+    if (rect.height + pad * 2 > maxH) {
+      top = clamp(rect.top - pad, 8, window.innerHeight - height - 8)
+    }
+    return {
+      top,
+      left: Math.max(8, rect.left - pad),
+      width: Math.min(window.innerWidth - 16, rect.width + pad * 2),
+      height,
+    }
+  })()
 
   const edge = 12
-  // Prefer env(safe-area) via CSS for docked cards; JS clamp uses a generous bottom inset.
   const bottomInset = Math.max(edge, narrow ? 16 : 12) + (narrow ? 8 : 0)
-  const cardWidth = narrow ? Math.min(window.innerWidth - edge * 2, 400) : 380
+  const cardWidth = narrow ? Math.min(window.innerWidth - edge * 2, 400) : 360
   const dim = step.dim ?? 'full'
-  const dockBottom = Boolean(step.hideSpotlight || step.placement === 'center' || narrow)
-
-  let cardTop = window.innerHeight / 2 - cardHeight / 2
-  let cardLeft = window.innerWidth / 2 - cardWidth / 2
-
-  if (!dockBottom && highlight) {
-    const gap = 14
-    switch (step.placement) {
-      case 'bottom':
-        cardTop = highlight.top + highlight.height + gap
-        cardLeft = highlight.left + highlight.width / 2 - cardWidth / 2
-        break
-      case 'top':
-        cardTop = highlight.top - gap - cardHeight
-        cardLeft = highlight.left + highlight.width / 2 - cardWidth / 2
-        break
-      case 'left':
-        cardTop = highlight.top + highlight.height / 2 - cardHeight / 2
-        cardLeft = highlight.left - gap - cardWidth
-        break
-      case 'right':
-        cardTop = highlight.top + highlight.height / 2 - cardHeight / 2
-        cardLeft = highlight.left + highlight.width + gap
-        break
-      default:
-        break
-    }
-  }
-
-  const maxTop = Math.max(edge, window.innerHeight - cardHeight - bottomInset)
-  cardTop = clamp(cardTop, edge, maxTop)
-  cardLeft = clamp(cardLeft, edge, Math.max(edge, window.innerWidth - cardWidth - edge))
+  const showcase = Boolean(step.hideSpotlight || (step.placement === 'center' && !highlight))
+  const slot = showcase
+    ? {
+        top: 0,
+        left: narrow ? edge : (window.innerWidth - cardWidth) / 2,
+        maxHeight: Math.min(cardHeight, window.innerHeight * 0.42),
+        dock: 'bottom' as const,
+      }
+    : placeCardClearOfHighlight(
+        highlight,
+        cardWidth,
+        cardHeight,
+        step.placement,
+        window.innerWidth,
+        window.innerHeight,
+        edge,
+        bottomInset,
+        16,
+      )
 
   const nextDisabled = busy || Boolean(loadError) || (!ready && Boolean(step.enter?.length || step.screen === 'game'))
 
-  const cardStyle: CSSProperties = dockBottom
-    ? {
-        top: 'auto',
-        bottom: `max(${bottomInset}px, env(safe-area-inset-bottom, 0px))`,
-        left: narrow ? edge : cardLeft,
-        width: narrow ? `calc(100% - ${edge * 2}px)` : cardWidth,
-        maxHeight: `calc(100dvh - ${edge * 2}px - env(safe-area-inset-bottom, 0px))`,
-      }
-    : {
-        top: cardTop,
-        left: cardLeft,
-        width: cardWidth,
-        maxHeight: `calc(100dvh - ${edge * 2}px)`,
-      }
+  const cardStyle: CSSProperties =
+    slot.dock === 'bottom'
+      ? {
+          top: 'auto',
+          bottom: `max(${bottomInset}px, env(safe-area-inset-bottom, 0px))`,
+          left: narrow ? edge : clamp(slot.left, edge, window.innerWidth - cardWidth - edge),
+          width: narrow ? `calc(100% - ${edge * 2}px)` : cardWidth,
+          maxHeight: `min(${Math.max(148, slot.maxHeight)}px, 42dvh)`,
+        }
+      : slot.dock === 'top'
+        ? {
+            top: `max(${edge}px, env(safe-area-inset-top, 0px))`,
+            bottom: 'auto',
+            left: narrow ? edge : clamp(slot.left, edge, window.innerWidth - cardWidth - edge),
+            width: narrow ? `calc(100% - ${edge * 2}px)` : cardWidth,
+            maxHeight: `min(${Math.max(148, slot.maxHeight)}px, 42dvh)`,
+          }
+        : {
+            top: slot.top,
+            left: slot.left,
+            width: cardWidth,
+            maxHeight: `min(${Math.max(148, slot.maxHeight)}px, 48dvh)`,
+          }
 
   return (
     <div className="product-tour" role="dialog" aria-modal="true" aria-label="ChessArena tutorial">
@@ -339,7 +478,7 @@ export function ProductTour({
       <div
         ref={cardRef}
         key={step.id}
-        className={`product-tour-card${dockBottom ? ' product-tour-card--docked' : ''}${narrow ? ' product-tour-card--mobile' : ''}`}
+        className={`product-tour-card${slot.dock !== 'free' ? ` product-tour-card--docked product-tour-card--${slot.dock}` : ''}${narrow ? ' product-tour-card--mobile' : ''}`}
         style={cardStyle}
       >
         <div className="product-tour-track" aria-hidden>
