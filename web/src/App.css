@@ -2243,7 +2243,9 @@
   position: absolute;
   z-index: 2;
   pointer-events: auto;
-  padding: 1rem 1.1rem 0.95rem;
+  display: flex;
+  flex-direction: column;
+  padding: 0.85rem 1rem 0.8rem;
   border-radius: 16px;
   background: linear-gradient(180deg, #121a2c 0%, #0b1220 100%);
   border: 1px solid rgba(196, 181, 253, 0.28);
@@ -2254,10 +2256,24 @@
     0 0 40px rgba(124, 58, 237, 0.18);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
   box-sizing: border-box;
   animation: tour-card-in 0.28s ease;
+}
+
+.product-tour-card-main {
+  min-height: 0;
+  overflow: hidden;
+  flex: 0 1 auto;
+}
+
+.product-tour-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
 }
 
 @keyframes tour-card-in {
@@ -2334,16 +2350,9 @@
 }
 
 .product-tour-body {
-  margin: 0 0 0.9rem;
-  font-size: 0.92rem;
-  line-height: 1.45;
-}
-
-.product-tour-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
 }
 
 .product-tour-actions-right {

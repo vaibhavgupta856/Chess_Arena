@@ -5,6 +5,7 @@ export type TourPlacement = 'center' | 'top' | 'bottom' | 'left' | 'right'
 export type TourAction =
   | 'ensureLobbyPlay'
   | 'startDemoGame'
+  | 'ensure2d'
   | 'ensure3d'
   | 'openCamera'
   | 'autoRotateOn'
@@ -64,13 +65,25 @@ export const TOUR_STEPS: TourStep[] = [
     enter: ['ensure3d', 'autoRotateOff', 'openCamera', 'closeSidebar'],
   },
   {
+    id: 'board-2d',
+    title: 'Classic 2D board',
+    body: 'Same game on a flat board. Tap or drag pieces — then flip back to 3D anytime.',
+    target: 'board',
+    placement: 'top',
+    screen: 'game',
+    dim: 'soft',
+    hideSpotlight: true,
+    enter: ['ensure2d', 'autoRotateOff', 'closeSidebar'],
+    nextLabel: 'Show the switch',
+  },
+  {
     id: 'view-toggle',
     title: '2D, 3D & themes',
-    body: 'Flip between classic 2D and 3D anytime. Theme swatches live here during a game too.',
+    body: 'This switch flips 2D and 3D. Themes live here in-game too.',
     target: 'view-toggle',
     placement: 'bottom',
     screen: 'game',
-    enter: ['autoRotateOff', 'closeSidebar'],
+    enter: ['ensure2d', 'autoRotateOff', 'closeSidebar'],
   },
   {
     id: 'mobile-bar',
@@ -85,7 +98,7 @@ export const TOUR_STEPS: TourStep[] = [
   {
     id: 'sidebar-game',
     title: 'Game panel',
-    body: 'Room code, mode, whose turn it is, and clocks when you play timed. On mobile this slides up from Menu.',
+    body: 'Room code, mode, and whose turn it is. On phones this slides up from Menu.',
     target: 'sidebar-game',
     placement: 'left',
     screen: 'game',
