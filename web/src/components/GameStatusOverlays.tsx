@@ -54,6 +54,7 @@ export function GameStatusOverlays({ game }: Props) {
     <div className="game-banner-overlay" aria-live="polite">
       {isCheckmate ? (
         <div className="game-banner game-banner--checkmate" role="status">
+          <span className="game-banner-kicker">Game over</span>
           <span className="game-banner-title">Checkmate</span>
           {game.outcome && game.outcome !== '*' && (
             <span className="game-banner-sub">{game.outcome}</span>
@@ -65,16 +66,16 @@ export function GameStatusOverlays({ game }: Props) {
           className="game-banner game-banner--check"
           role="status"
         >
+          <span className="game-banner-kicker">Watch the king</span>
           <span className="game-banner-title">Check</span>
         </div>
       ) : tipVisible ? (
         <div key={`tip-${game.id}`} className="game-banner game-banner--tip" role="status">
+          <span className="game-banner-kicker">You’re in the room</span>
           <span className="game-banner-title game-banner-title--tip">
-            Drag the board to rotate the view
+            Drag to orbit the 3D board
           </span>
-          <span className="game-banner-sub">
-            Click or drag pieces to move
-          </span>
+          <span className="game-banner-sub">Click or drag pieces to move</span>
         </div>
       ) : null}
     </div>

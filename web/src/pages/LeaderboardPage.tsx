@@ -43,6 +43,7 @@ export function LeaderboardPage({ onBack, user }: Props) {
   return (
     <div className="leaderboard-page">
       <div className="lobby-panel">
+        <p className="page-kicker">Rankings</p>
         <h2>Leaderboard</h2>
         <p className="lobby-hint">Ratings from online matches between registered players.</p>
         {user && (

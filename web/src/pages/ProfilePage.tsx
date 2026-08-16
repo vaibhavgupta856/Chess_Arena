@@ -34,6 +34,7 @@ export function ProfilePage({ onBack }: Props) {
   return (
     <div className="profile-page">
       <div className="lobby-panel">
+        <p className="page-kicker">Player</p>
         <h2>Your profile</h2>
         <dl className="sidebar-meta profile-meta">
           <div>
