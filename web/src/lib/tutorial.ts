@@ -66,24 +66,24 @@ export const TOUR_STEPS: TourStep[] = [
   },
   {
     id: 'board-2d',
-    title: 'Classic 2D board',
-    body: 'Same game on a flat board. Tap or drag pieces — then flip back to 3D anytime.',
+    title: '2D is here if you want it',
+    body: 'Prefer a flat board? Same game in 2D. The room stays 3D by default — this is just an option.',
     target: 'board',
     placement: 'top',
     screen: 'game',
     dim: 'soft',
     hideSpotlight: true,
     enter: ['ensure2d', 'autoRotateOff', 'closeSidebar'],
-    nextLabel: 'Show the switch',
+    nextLabel: 'Back to 3D',
   },
   {
     id: 'view-toggle',
-    title: '2D, 3D & themes',
-    body: 'This switch flips 2D and 3D. Themes live here in-game too.',
+    title: 'Flip back to 3D',
+    body: 'Use this switch anytime. Themes live here too. We’re staying in the 3D room for the rest of the tour.',
     target: 'view-toggle',
     placement: 'bottom',
     screen: 'game',
-    enter: ['ensure2d', 'autoRotateOff', 'closeSidebar'],
+    enter: ['ensure3d', 'autoRotateOff', 'closeSidebar'],
   },
   {
     id: 'mobile-bar',
@@ -93,7 +93,7 @@ export const TOUR_STEPS: TourStep[] = [
     placement: 'top',
     screen: 'game',
     mobileOnly: true,
-    enter: ['closeSidebar'],
+    enter: ['ensure3d', 'closeSidebar'],
   },
   {
     id: 'sidebar-game',
@@ -102,7 +102,7 @@ export const TOUR_STEPS: TourStep[] = [
     target: 'sidebar-game',
     placement: 'left',
     screen: 'game',
-    enter: ['openSidebar'],
+    enter: ['ensure3d', 'openSidebar'],
   },
   {
     id: 'sidebar-history',
@@ -111,7 +111,7 @@ export const TOUR_STEPS: TourStep[] = [
     target: 'sidebar-history',
     placement: 'left',
     screen: 'game',
-    enter: ['openSidebar'],
+    enter: ['ensure3d', 'openSidebar'],
   },
   {
     id: 'sidebar-coach',
@@ -121,7 +121,7 @@ export const TOUR_STEPS: TourStep[] = [
     placement: 'left',
     screen: 'game',
     optional: true,
-    enter: ['openSidebar'],
+    enter: ['ensure3d', 'openSidebar'],
   },
   {
     id: 'sidebar-invite',
@@ -131,7 +131,7 @@ export const TOUR_STEPS: TourStep[] = [
     placement: 'left',
     screen: 'game',
     optional: true,
-    enter: ['openSidebar'],
+    enter: ['ensure3d', 'openSidebar'],
   },
   {
     id: 'sidebar-actions',
@@ -140,7 +140,7 @@ export const TOUR_STEPS: TourStep[] = [
     target: 'sidebar-actions',
     placement: 'left',
     screen: 'game',
-    enter: ['openSidebar'],
+    enter: ['ensure3d', 'openSidebar'],
   },
   {
     id: 'sidebar-moves',
@@ -149,7 +149,7 @@ export const TOUR_STEPS: TourStep[] = [
     target: 'sidebar-moves',
     placement: 'left',
     screen: 'game',
-    enter: ['openSidebar'],
+    enter: ['ensure3d', 'openSidebar'],
   },
   {
     id: 'sidebar-leave',
@@ -158,7 +158,7 @@ export const TOUR_STEPS: TourStep[] = [
     target: 'sidebar-leave',
     placement: 'left',
     screen: 'game',
-    enter: ['openSidebar'],
+    enter: ['ensure3d', 'openSidebar'],
   },
   {
     id: 'brand',
