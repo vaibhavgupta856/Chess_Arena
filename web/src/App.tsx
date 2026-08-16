@@ -11,7 +11,7 @@ import { ThemePicker } from './components/ThemePicker'
 import { GameStatusOverlays } from './components/GameStatusOverlays'
 import { ProductTour, useShouldAutoStartTour } from './components/ProductTour'
 import { useTheme } from './hooks/useTheme'
-import { getLobbyUiColors, getRoomAtmosphere } from './lib/themes'
+import { BOARD_THEMES, getLobbyUiColors, getRoomAtmosphere } from './lib/themes'
 import type { TourAction } from './lib/tutorial'
 
 import { canPlayerMove, useGame } from './hooks/useGame'
@@ -33,7 +33,7 @@ function seatForGame(g: GameState, fallback: string): string {
 }
 
 function App() {
-  const { theme } = useTheme()
+  const { theme, themeId, setThemeId } = useTheme()
   const { user, tabLabel } = useAuth()
   const lobbyUi = getLobbyUiColors(theme.background)
   const roomAtmosphere = getRoomAtmosphere(theme)
@@ -81,6 +81,8 @@ function App() {
   const screenRef = useRef(screen)
   const gameRef = useRef(game)
   const demoCreateLock = useRef<Promise<void> | null>(null)
+  const themeCycleRef = useRef<number | null>(null)
+  const themeRestoreRef = useRef<string | null>(null)
   screenRef.current = screen
   gameRef.current = game
 
@@ -115,10 +117,25 @@ function App() {
     [clientId, enterGame],
   )
 
+  const stopThemeCycle = useCallback(
+    (restore = true) => {
+      if (themeCycleRef.current != null) {
+        window.clearInterval(themeCycleRef.current)
+        themeCycleRef.current = null
+      }
+      if (restore && themeRestoreRef.current) {
+        setThemeId(themeRestoreRef.current, { persist: false })
+        themeRestoreRef.current = null
+      }
+    },
+    [setThemeId],
+  )
+
   const handleTourAction = useCallback(
     async (action: TourAction) => {
       switch (action) {
         case 'ensureLobbyPlay':
+          stopThemeCycle(true)
           setLobbyView('play')
           setSidebarOpen(false)
           setTourAutoRotate(false)
@@ -184,21 +201,38 @@ function App() {
         case 'playDemoMoves':
           void playDemoMoves()
           break
+        case 'cycleThemes': {
+          stopThemeCycle(false)
+          if (!themeRestoreRef.current) themeRestoreRef.current = themeId
+          const ids = BOARD_THEMES.map((item) => item.id)
+          if (ids.length === 0) break
+          let i = Math.max(0, ids.indexOf(themeRestoreRef.current))
+          setThemeId(ids[i], { persist: false })
+          themeCycleRef.current = window.setInterval(() => {
+            i = (i + 1) % ids.length
+            setThemeId(ids[i], { persist: false })
+          }, 1300)
+          break
+        }
+        case 'stopThemeCycle':
+          stopThemeCycle(true)
+          break
         default:
           break
       }
     },
-    [createGame, leaveToLobby, playDemoMoves],
+    [createGame, leaveToLobby, playDemoMoves, setThemeId, stopThemeCycle, themeId],
   )
 
   const closeTour = useCallback(() => {
+    stopThemeCycle(true)
     setTourOpen(false)
     setTourAutoStart(false)
     setTourAutoRotate(false)
     setTourShowCamera(false)
     setView('3d')
     setTourIndex(0)
-  }, [setTourAutoStart])
+  }, [setTourAutoStart, stopThemeCycle])
 
   const startTour = useCallback(() => {
     setLobbyView('play')

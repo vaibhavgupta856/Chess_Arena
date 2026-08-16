@@ -12,9 +12,9 @@
     rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
 
   --sans: 'Outfit', system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: 'Fraunces', 'Times New Roman', serif;
-  --display: 'Fraunces', 'Times New Roman', serif;
-  --mono: ui-monospace, Consolas, monospace;
+  --heading: 'Syne', system-ui, sans-serif;
+  --display: 'Syne', system-ui, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
 
   font: 18px/145% var(--sans);
   letter-spacing: 0.18px;
