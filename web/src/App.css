@@ -2239,12 +2239,54 @@
   }
 }
 
+.product-tour-arrow {
+  position: absolute;
+  width: 0;
+  height: 0;
+  z-index: 3;
+  pointer-events: none;
+  filter: drop-shadow(0 0 1px rgba(196, 181, 253, 0.55));
+}
+
+.product-tour-arrow--left {
+  left: -10px;
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  border-right: 10px solid #121a2c;
+  transform: translateY(-50%);
+}
+
+.product-tour-arrow--right {
+  right: -10px;
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  border-left: 10px solid #121a2c;
+  transform: translateY(-50%);
+}
+
+.product-tour-arrow--up {
+  top: -10px;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-bottom: 10px solid #121a2c;
+  transform: translateX(-50%);
+}
+
+.product-tour-arrow--down {
+  bottom: -10px;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 10px solid #121a2c;
+  transform: translateX(-50%);
+}
+
 .product-tour-card {
   position: absolute;
   z-index: 2;
   pointer-events: auto;
   display: flex;
   flex-direction: column;
+  overflow: visible;
   padding: 0.85rem 1rem 0.8rem;
   border-radius: 16px;
   background: linear-gradient(180deg, #121a2c 0%, #0b1220 100%);
@@ -2256,7 +2298,7 @@
     0 0 40px rgba(124, 58, 237, 0.18);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  overflow: hidden;
+  overflow: visible;
   box-sizing: border-box;
   animation: tour-card-in 0.28s ease;
 }
