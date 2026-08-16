@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 import {
   BOARD_THEMES,
   getStoredThemeId,
@@ -18,10 +18,10 @@ const ThemeContext = createContext<ThemeContextValue | null>(null)
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [themeId, setThemeIdState] = useState(getStoredThemeId)
 
-  const setThemeId = (id: string, opts?: { persist?: boolean }) => {
+  const setThemeId = useCallback((id: string, opts?: { persist?: boolean }) => {
     if (opts?.persist !== false) setStoredThemeId(id)
     setThemeIdState(id)
-  }
+  }, [])
 
   const value = useMemo(
     () => ({
@@ -29,7 +29,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       themeId,
       setThemeId,
     }),
-    [themeId],
+    [themeId, setThemeId],
   )
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>

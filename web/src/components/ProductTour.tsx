@@ -328,6 +328,7 @@ export function ProductTour({
     const el = audioRef.current
     if (!el) return
     if (playingIdRef.current === id && !el.paused && !el.ended) return
+    el.pause()
     el.src = tourVoiceUrl(id)
     el.currentTime = 0
     playingIdRef.current = id
@@ -538,47 +539,55 @@ export function ProductTour({
     }
   }, [active, stopVoice])
 
+  const finishRef = useRef(finish)
+  finishRef.current = finish
+  const indexRef = useRef(index)
+  indexRef.current = index
+  const stepsLenRef = useRef(steps.length)
+  stepsLenRef.current = steps.length
+
   useEffect(() => {
     if (!active || !tourStarted || voiceMuted || !ready || !step || loadError) return
     playVoice(step.id)
   }, [active, tourStarted, voiceMuted, ready, stepId, loadError, playVoice, step])
 
   useEffect(() => {
-    if (!active || !tourStarted || !ready || busy || loadError || voiceMuted || !step) return
+    if (!active || !tourStarted || !ready || busy || loadError || voiceMuted || !stepId) return
     const audio = audioRef.current
     if (!audio) return
+
     let advanced = false
     let pauseTimer: number | undefined
+    const expectedId = stepId
+
+    const clipFinished = () => {
+      const dur = audio.duration
+      if (!Number.isFinite(dur) || dur < 0.8) return false
+      if (playingIdRef.current !== expectedId) return false
+      return audio.ended && audio.currentTime >= dur * 0.8
+    }
+
     const go = () => {
       if (advanced) return
       advanced = true
-      if (index >= steps.length - 1) finish()
-      else onIndexChange(index + 1)
+      const i = indexRef.current
+      if (i >= stepsLenRef.current - 1) finishRef.current()
+      else onIndexChangeRef.current(i + 1)
     }
+
     const onEnded = () => {
-      if (playingIdRef.current !== step.id) return
+      if (!clipFinished()) return
       pauseTimer = window.setTimeout(go, 1000)
     }
+
     audio.addEventListener('ended', onEnded)
+    if (clipFinished()) pauseTimer = window.setTimeout(go, 1000)
+
     return () => {
-      advanced = true
       audio.removeEventListener('ended', onEnded)
       if (pauseTimer) window.clearTimeout(pauseTimer)
     }
-  }, [
-    active,
-    tourStarted,
-    ready,
-    busy,
-    loadError,
-    voiceMuted,
-    stepId,
-    index,
-    steps.length,
-    finish,
-    onIndexChange,
-    step,
-  ])
+  }, [active, tourStarted, ready, busy, loadError, voiceMuted, stepId])
 
   const bodyText = loadError
     ? loadError
