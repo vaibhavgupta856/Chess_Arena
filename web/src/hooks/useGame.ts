@@ -80,6 +80,8 @@ export function useGame() {
   const [viewPly, setViewPly] = useState(0)
   const prevFenRef = useRef<string | null>(null)
   const socketRef = useRef<WebSocket | null>(null)
+  const gameLiveRef = useRef<GameState | null>(null)
+  gameLiveRef.current = game
 
   const playMoveFeedback = useCallback((prevFen: string | null, next: GameState) => {
     if (!prevFen || prevFen === next.fen) return
@@ -296,6 +298,60 @@ export function useGame() {
     [game, playMoveFeedback, refreshGame, viewPly],
   )
 
+  const playDemoMoves = useCallback(async () => {
+    const sleep = (ms: number) => new Promise((r) => window.setTimeout(r, ms))
+    const waitFor = async (pred: () => boolean, timeoutMs: number) => {
+      const started = Date.now()
+      while (Date.now() - started < timeoutMs) {
+        if (pred()) return true
+        await sleep(180)
+      }
+      return pred()
+    }
+
+    const whiteReady = () => {
+      const g = gameLiveRef.current
+      return Boolean(g && !g.over && g.turn === 'white' && !g.botThinking)
+    }
+
+    const post = async (uci: string) => {
+      const g = gameLiveRef.current
+      if (!g || g.over || g.turn !== 'white') return false
+      const cid = getGameClientId(g.id)
+      const res = await fetch(`${API_BASE}/games/${g.id}/moves`, {
+        method: 'POST',
+        headers: apiHeaders(),
+        body: JSON.stringify({ uci, clientId: cid }),
+      })
+      if (!res.ok) return false
+      const data = normalizeGameState((await res.json()) as GameState, cid)
+      playMoveFeedback(g.fen, data)
+      prevFenRef.current = data.fen
+      setViewPly(data.ply ?? 0)
+      setGame(data)
+      return true
+    }
+
+    await sleep(800)
+    if (!gameLiveRef.current) {
+      await waitFor(() => Boolean(gameLiveRef.current), 8000)
+    }
+
+    const candidates = ['e2e4', 'g1f3', 'd2d4', 'b1c3', 'f1c4', 'c2c4']
+    let played = 0
+    for (const uci of candidates) {
+      if (played >= 3) break
+      if (!whiteReady()) {
+        const ok = await waitFor(whiteReady, 9000)
+        if (!ok) break
+      }
+      if (await post(uci)) {
+        played += 1
+        await sleep(520)
+      }
+    }
+  }, [playMoveFeedback])
+
 
   const resign = useCallback(
     async (color?: 'white' | 'black') => {
@@ -428,6 +484,7 @@ export function useGame() {
     loadGame,
     enterGame: applyGame,
     submitMove,
+    playDemoMoves,
     resign,
     offerDraw,
     respondDraw,

@@ -54,6 +54,7 @@ function App() {
     joinGame,
     enterGame,
     submitMove,
+    playDemoMoves,
     resign,
     offerDraw,
     respondDraw,
@@ -180,11 +181,14 @@ function App() {
         case 'closeSidebar':
           setSidebarOpen(false)
           break
+        case 'playDemoMoves':
+          void playDemoMoves()
+          break
         default:
           break
       }
     },
-    [createGame, leaveToLobby],
+    [createGame, leaveToLobby, playDemoMoves],
   )
 
   const closeTour = useCallback(() => {

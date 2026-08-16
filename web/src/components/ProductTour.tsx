@@ -46,6 +46,14 @@ function arrowAlongEdge(targetMid: number, start: number, size: number) {
   return clamp(targetMid - start, 18, Math.max(18, size - 18))
 }
 
+function isTopChromeTarget(highlight: Rect | null, target?: string) {
+  if (target === 'view-toggle' || target === 'theme' || target === 'brand' || target === 'nav') {
+    return true
+  }
+  if (!highlight) return false
+  return highlight.top < 120 && highlight.height < 140
+}
+
 /** Place the tour card beside the spotlight — never on top of it. */
 function placeCardClearOfHighlight(
   highlight: Rect | null,
@@ -58,6 +66,7 @@ function placeCardClearOfHighlight(
   edge: number,
   bottomInset: number,
   gap: number,
+  target?: string,
 ): CardSlot {
   const minCard = 220
   const maxTop = Math.max(edge, vh - minCard - bottomInset)
@@ -75,9 +84,24 @@ function placeCardClearOfHighlight(
 
   const midY = highlight.top + highlight.height / 2
   const midX = highlight.left + highlight.width / 2
+  const topChrome = isTopChromeTarget(highlight, target)
+
+  // Header / view-toggle: sit well below the chrome with the triangle pointing up.
+  if (topChrome) {
+    const bandBottom = Math.max(highlight.top + highlight.height, block.top + block.height)
+    const top = clamp(Math.max(bandBottom + 28, vh * 0.34), edge, maxTop)
+    return {
+      top,
+      left: clamp(midX - cardW / 2, edge, Math.max(edge, vw - cardW - edge)),
+      maxHeight: Math.max(minCard, vh - top - bottomInset),
+      dock: 'free',
+      arrow: 'up',
+    }
+  }
+
   const leftRail = block.left < vw * 0.28 && block.height > vh * 0.28
   const bottomSheet = block.width > vw * 0.62 && block.top > vh * 0.32
-  const rightRail = block.left + block.width > vw * 0.72 && block.height > 80
+  const rightRail = block.left + block.width > vw * 0.72 && block.height > vh * 0.28
 
   if (leftRail && vw - (block.left + block.width) > cardW + gap + edge) {
     const left = block.left + block.width + gap
@@ -180,6 +204,7 @@ function placeCardClearOfHighlight(
   }
 
   // Last resort: sit in the largest empty side, still pointing at the target.
+  // Never pin to the top edge — that covers header controls like the 2D/3D switch.
   if (spaceRight >= cardW * 0.7) {
     return {
       top: clamp(midY - cardH / 2, edge, maxTop),
@@ -189,17 +214,36 @@ function placeCardClearOfHighlight(
       arrow: 'left',
     }
   }
+  if (highlight.top < vh * 0.45) {
+    const top = clamp(Math.max(highlight.top + highlight.height + gap, vh * 0.34), edge, maxTop)
+    return {
+      top,
+      left: clamp(midX - cardW / 2, edge, Math.max(edge, vw - cardW - edge)),
+      maxHeight: Math.max(minCard, vh - top - bottomInset),
+      dock: 'free',
+      arrow: 'up',
+    }
+  }
   return {
-    top: edge,
-    left: clamp(vw - cardW - edge, edge, vw - cardW - edge),
+    top: clamp(highlight.top - minCard - gap, edge, maxTop),
+    left: clamp(midX - cardW / 2, edge, Math.max(edge, vw - cardW - edge)),
     maxHeight: minCard,
-    dock: 'top',
-    arrow: midY > vh / 2 ? 'down' : 'up',
+    dock: 'free',
+    arrow: 'down',
   }
 }
 
 function readAvoidRect(target?: string): Rect | null {
   if (!target) return null
+  if (target === 'view-toggle' || target === 'theme' || target === 'brand' || target === 'nav') {
+    const hud = document.querySelector('.game-hud, .app-header') as HTMLElement | null
+    if (hud) {
+      const r = hud.getBoundingClientRect()
+      if (r.width > 2 && r.height > 2) {
+        return { top: r.top, left: r.left, width: r.width, height: r.height }
+      }
+    }
+  }
   const el = document.querySelector(`[data-tour="${target}"]`) as HTMLElement | null
   const host = el?.closest('.game-sidebar, .camera-controls, .mobile-game-bar, .view-toggle, .lobby-nav') as HTMLElement | null
   if (!host) return readTargetRect(target)
@@ -491,6 +535,7 @@ export function ProductTour({
         edge,
         bottomInset,
         16,
+        step.target,
       )
 
   const nextDisabled = busy || Boolean(loadError) || (!ready && Boolean(step.enter?.length || step.screen === 'game'))
