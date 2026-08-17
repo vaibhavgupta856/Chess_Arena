@@ -9,6 +9,7 @@ import { GameSidebar } from './components/GameSidebar'
 import { MobileGameBar } from './components/MobileGameBar'
 import { ThemePicker } from './components/ThemePicker'
 import { GameStatusOverlays } from './components/GameStatusOverlays'
+import { BackendWakeScreen } from './components/BackendWakeScreen'
 import { ProductTour, useShouldAutoStartTour } from './components/ProductTour'
 import { useTheme } from './hooks/useTheme'
 import { BOARD_THEMES, getLobbyUiColors, getRoomAtmosphere } from './lib/themes'
@@ -78,6 +79,10 @@ function App() {
   const [tourIndex, setTourIndex] = useState(0)
   const [tourAutoRotate, setTourAutoRotate] = useState(false)
   const [tourShowCamera, setTourShowCamera] = useState(false)
+  const [apiReady, setApiReady] = useState(false)
+  const [apiFailed, setApiFailed] = useState(false)
+  const [wakeMessage, setWakeMessage] = useState('Contacting the chess server…')
+  const [wakeNonce, setWakeNonce] = useState(0)
   const screenRef = useRef(screen)
   const gameRef = useRef(game)
   const demoCreateLock = useRef<Promise<void> | null>(null)
@@ -90,7 +95,41 @@ function App() {
 
   const is3d = view === '3d' && screen === 'game'
   const canMove = game ? canPlayerMove(game, atLivePosition) : false
-  const tourActive = tourOpen || tourAutoStart
+  const tourActive = (tourOpen || tourAutoStart) && apiReady
+
+  useEffect(() => {
+    let cancelled = false
+    const wake = async () => {
+      setApiReady(false)
+      setApiFailed(false)
+      if (!apiBase) {
+        setWakeMessage('Chess server is not configured. Set VITE_API_BASE on Vercel.')
+        setApiFailed(true)
+        return
+      }
+      setWakeMessage('Starting the chess server…')
+      const ok = await checkServerHealth({
+        timeoutMs: 20000,
+        retries: 6,
+        onAttempt: (attempt, max) => {
+          if (cancelled) return
+          setWakeMessage(
+            attempt === 1
+              ? 'Starting the chess server…'
+              : `Waking the server (${attempt}/${max}) — this can take about a minute…`,
+          )
+        },
+      })
+      if (cancelled) return
+      setApiReady(ok)
+      setApiFailed(!ok)
+      if (!ok) setWakeMessage('Could not reach the chess server.')
+    }
+    void wake()
+    return () => {
+      cancelled = true
+    }
+  }, [apiBase, checkServerHealth, wakeNonce])
 
   useEffect(() => {
     if (!user || screen !== 'lobby') return
@@ -241,6 +280,16 @@ function App() {
     setTourIndex(0)
     setTourOpen(true)
   }, [])
+
+  if (!apiReady) {
+    return (
+      <BackendWakeScreen
+        message={wakeMessage}
+        failed={apiFailed}
+        onRetry={() => setWakeNonce((n) => n + 1)}
+      />
+    )
+  }
 
   const tour = (
     <ProductTour

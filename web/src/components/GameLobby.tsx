@@ -7,7 +7,11 @@ type Props = {
   onJoin: (gameId: string) => Promise<void>
   error: string | null
   apiBase: string
-  checkServerHealth: (opts?: { onAttempt?: (attempt: number, max: number) => void }) => Promise<boolean>
+  checkServerHealth: (opts?: {
+    timeoutMs?: number
+    retries?: number
+    onAttempt?: (attempt: number, max: number) => void
+  }) => Promise<boolean>
   user: UserProfile | null
   tabLabel?: string
   challenges?: FriendChallenge[]
@@ -59,49 +63,17 @@ export function GameLobby({
 }: Props) {
   const [joinId, setJoinId] = useState('')
   const [busy, setBusy] = useState(false)
-  const [serverOk, setServerOk] = useState<boolean | null>(null)
+  const [serverOk, setServerOk] = useState<boolean | null>(apiBase ? true : false)
   const [wakeStatus, setWakeStatus] = useState<string | null>(null)
   const [botLevel, setBotLevel] = useState<BotLevel>('casual')
   const [actionError, setActionError] = useState<string | null>(null)
 
   useEffect(() => {
-    let cancelled = false
-    void (async () => {
-      if (!apiBase) {
-        setServerOk(false)
-        setWakeStatus(null)
-        return
-      }
-      setServerOk(null)
-      setWakeStatus('Contacting chess server…')
-      const ok = await checkServerHealth({
-        onAttempt: (attempt, max) => {
-          if (cancelled) return
-          setWakeStatus(
-            attempt === 1
-              ? 'Contacting chess server…'
-              : `Waking free-tier server (${attempt}/${max}) — this can take up to a minute…`,
-          )
-        },
-      })
-      if (!cancelled) {
-        setServerOk(ok)
-        setWakeStatus(null)
-      }
-    })()
-    return () => {
-      cancelled = true
+    if (!apiBase) {
+      setServerOk(false)
+      setWakeStatus(null)
     }
-  }, [apiBase, checkServerHealth])
-
-  // While the lobby is open, ping the API so Render free tier stays warm.
-  useEffect(() => {
-    if (!apiBase || serverOk !== true) return
-    const id = window.setInterval(() => {
-      void fetch(`${apiBase}/health`, { signal: AbortSignal.timeout(15000) }).catch(() => {})
-    }, 5 * 60 * 1000)
-    return () => window.clearInterval(id)
-  }, [apiBase, serverOk])
+  }, [apiBase])
 
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true)
@@ -123,11 +95,13 @@ export function GameLobby({
     setWakeStatus('Contacting chess server…')
     void (async () => {
       const ok = await checkServerHealth({
+        timeoutMs: 20000,
+        retries: 6,
         onAttempt: (attempt, max) => {
           setWakeStatus(
             attempt === 1
               ? 'Contacting chess server…'
-              : `Waking free-tier server (${attempt}/${max}) — this can take up to a minute…`,
+              : `Waking the server (${attempt}/${max}) — this can take about a minute…`,
           )
         },
       })
@@ -263,7 +237,7 @@ export function GameLobby({
               Server offline.
               {!apiBase
                 ? ' Deploy the Go API and set VITE_API_BASE on Vercel.'
-                : ' Render free tier may be waking — wait a bit, then retry.'}
+                : ' The server may still be starting — wait a bit, then retry.'}
             </p>
             {apiBase && (
               <button type="button" className="lobby-join-btn" onClick={retryHealth}>
