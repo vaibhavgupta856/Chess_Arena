@@ -421,10 +421,8 @@ Align `GO_VERSION` on Render with the Go version you build against locally if de
 
 ### Frontend (Vercel)
 1. Deploy the `web/` app (Vite build).
-2. Set **`VITE_API_BASE`** to your Render API origin (no trailing path), e.g. `https://chess-arena-backend-vaibhav.onrender.com`.
+2. Set **`VITE_API_BASE`** to your Render API origin (no trailing path), e.g. `https://YOUR-SERVICE.onrender.com`.
 3. Rebuild so the client talks to the live API instead of `/api`.
-
-This repo includes a GitHub Action that pings `/health` every 10 minutes to reduce free-tier sleep. Set repo variable `RENDER_HEALTH_URL` if the URL differs.
 
 ---
 
@@ -433,8 +431,8 @@ This repo includes a GitHub Action that pings `/health` every 10 minutes to redu
 - **Games are not persisted** — restarting the API drops in-progress rooms; only accounts/friends/ELO survive in SQLite.
 - **Coach is offline for online PvP** — intentional so opponents cannot request engine help mid-match.
 - **Anonymous online seats** use client ids; ELO only applies when both players are registered users.
-- **Render free tier cold starts** — free web services sleep after ~15 minutes with no traffic and take about **one minute** to wake. This repo includes a GitHub Action (`.github/workflows/keep-alive.yml`) that pings `https://chess-arena-backend-vaibhav.onrender.com/health` every 10 minutes. Optionally set repo variable `RENDER_HEALTH_URL`, and/or add a free [UptimeRobot](https://uptimerobot.com) HTTP monitor on the same URL every 10 minutes (more reliable than GitHub cron). Keeping the service awake uses free instance hours (~720/month if always on; limit is 750).
-- Do not use the old suspended host `chessarena-api.onrender.com` — the live service is **chess-arena-backend-vaibhav**.
+- **Render free tier cold starts** — free web services sleep after ~15 minutes with no traffic and take about **one minute** to wake. Keep-alive pings were removed so free instance hours are not burned. The first request after sleep may take a minute.
+- Do not use old suspended hosts; set **`VITE_API_BASE`** to your current Render URL.
 - Root `web/README.md` may still contain the default Vite template; this file is the project source of truth.
 
 ---
