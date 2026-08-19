@@ -190,7 +190,7 @@ ChessArena is **3D-first**. Rooms open in a Three.js scene with orbit camera, an
 
 ```
 Chess_Arena/
-├── FINAL DOC.md                 # this document
+├── final doc.md                 # this document
 ├── README.md                    # shorter project README
 ├── go.mod / go.sum
 ├── render.yaml                  # Render API service blueprint
@@ -984,7 +984,7 @@ Commit new files under `web/public/tour/voice/`.
 
 | Item | Value |
 |------|--------|
-| Name | `FINAL DOC.md` |
+| Name | `final doc.md` |
 | Complements | `README.md` (shorter), `web/README.md` (frontend pointer) |
 | Source of truth for behavior | This file plus the Go/TS sources it names |
 
