@@ -92,7 +92,7 @@ export function GameLobby({
 
   const retryHealth = () => {
     setServerOk(null)
-    setWakeStatus('Contacting chess server…')
+    setWakeStatus('Backend is loading…')
     void (async () => {
       const ok = await checkServerHealth({
         timeoutMs: 20000,
@@ -100,8 +100,8 @@ export function GameLobby({
         onAttempt: (attempt, max) => {
           setWakeStatus(
             attempt === 1
-              ? 'Contacting chess server…'
-              : `Waking the server (${attempt}/${max}) — this can take about a minute…`,
+              ? 'Backend is loading…'
+              : `Backend is loading (${attempt}/${max}) — this can take about a minute…`,
           )
         },
       })

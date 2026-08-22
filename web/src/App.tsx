@@ -81,7 +81,7 @@ function App() {
   const [tourShowCamera, setTourShowCamera] = useState(false)
   const [apiReady, setApiReady] = useState(false)
   const [apiFailed, setApiFailed] = useState(false)
-  const [wakeMessage, setWakeMessage] = useState('Contacting the chess server…')
+  const [wakeMessage, setWakeMessage] = useState('Backend is loading…')
   const [wakeNonce, setWakeNonce] = useState(0)
   const screenRef = useRef(screen)
   const gameRef = useRef(game)
@@ -107,7 +107,7 @@ function App() {
         setApiFailed(true)
         return
       }
-      setWakeMessage('Starting the chess server…')
+      setWakeMessage('Backend is loading…')
       const ok = await checkServerHealth({
         timeoutMs: 20000,
         retries: 6,
@@ -115,15 +115,15 @@ function App() {
           if (cancelled) return
           setWakeMessage(
             attempt === 1
-              ? 'Starting the chess server…'
-              : `Waking the server (${attempt}/${max}) — this can take about a minute…`,
+              ? 'Backend is loading…'
+              : `Backend is loading (${attempt}/${max}) — this can take about a minute…`,
           )
         },
       })
       if (cancelled) return
       setApiReady(ok)
       setApiFailed(!ok)
-      if (!ok) setWakeMessage('Could not reach the chess server.')
+      if (!ok) setWakeMessage('Could not reach the backend.')
     }
     void wake()
     return () => {

@@ -25,10 +25,10 @@ export function BackendWakeScreen({ message, failed, onRetry }: Props) {
           ♔
         </span>
         <p className="backend-wake-kicker">ChessArena</p>
-        <h1 className="backend-wake-title">{failed ? 'Server didn’t wake' : 'Starting the chess server'}</h1>
+        <h1 className="backend-wake-title">{failed ? 'Backend didn’t load' : 'Backend is loading'}</h1>
         <p className="backend-wake-body">
           {failed
-            ? 'The API is still spinning up, or it isn’t reachable. Wait a moment and retry.'
+            ? 'The backend is still spinning up, or it isn’t reachable. Wait a moment and retry.'
             : message}
         </p>
         {!failed && (
@@ -43,7 +43,7 @@ export function BackendWakeScreen({ message, failed, onRetry }: Props) {
         )}
         {!failed && (
           <p className="backend-wake-hint">
-            First visit after sleep can take about a minute
+            Backend is loading — first visit after sleep can take about a minute
             {elapsed > 0 ? ` · ${elapsed}s` : ''}.
           </p>
         )}
